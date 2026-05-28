@@ -2,11 +2,13 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Absensi FSR" />
+  <meta name="format-detection" content="telephone=no" />
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="https://api.iconify.design/material-symbols:fingerprint.svg?color=%236366f1" />
   <title>Absensi FSR</title>
@@ -523,6 +525,69 @@
     }
     .geofence-in { background: #dcfce7; color: #166534; }
     .geofence-out { background: #fef3c7; color: #92400e; }
+
+    /* ── Mobile / PWA Optimization ────────────────── */
+    /* Cegah iOS auto-zoom saat fokus input (font-size minimal 16px) */
+    @media (max-width: 640px) {
+      .field { font-size: 16px !important; }
+      input[type="text"], input[type="password"], input[type="email"],
+      input[type="tel"], input[type="number"], input[type="date"],
+      select, textarea { font-size: 16px !important; }
+      #clock { font-size: clamp(2.25rem, 11vw, 3.5rem); }
+    }
+
+    /* Tap-target minimum 44x44px (rekomendasi Apple/WCAG) */
+    .btn, .nav-item, .tab-btn, .dark-toggle, .geofence-badge { min-height: 36px; }
+    .btn-primary, .btn-checkin, .btn-checkout, .btn-success, .btn-danger { min-height: 48px; }
+
+    /* Hilangkan tap highlight biru iOS, anti-callout */
+    * { -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; }
+
+    /* Cegah pull-to-refresh & overscroll bounce di body */
+    html, body {
+      overscroll-behavior-y: contain;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    /* Safe-area insets untuk notch / dynamic island */
+    #view-login { padding: max(1.5rem, env(safe-area-inset-top)) max(1.5rem, env(safe-area-inset-right)) max(1.5rem, env(safe-area-inset-bottom)) max(1.5rem, env(safe-area-inset-left)); }
+    #view-karyawan > header,
+    #view-admin > header {
+      padding-top: max(0.9rem, env(safe-area-inset-top));
+      padding-left: max(1.25rem, env(safe-area-inset-left));
+      padding-right: max(1.25rem, env(safe-area-inset-right));
+    }
+
+    /* Standalone (terinstall ke home screen) styling halus */
+    @media (display-mode: standalone) {
+      body { user-select: none; }
+      .field, textarea, [contenteditable] { user-select: text; }
+    }
+
+    /* Admin: tabel harus scroll mulus & cukup lebar di layar kecil */
+    .scroll-x { -webkit-overflow-scrolling: touch; }
+    @media (max-width: 640px) {
+      .data-table th, .data-table td { padding: 0.55rem 0.7rem; font-size: 0.78rem; white-space: nowrap; }
+      .data-table { min-width: 640px; }
+      #tab-overview, #tab-users, #tab-absensi, #tab-pengajuan { padding: 0.85rem !important; }
+      .card { border-radius: 14px; }
+    }
+
+    /* Admin tab bar lebih nyaman di-scroll horizontal di HP */
+    @media (max-width: 640px) {
+      .tab-btn { padding: 0.55rem 0.9rem; font-size: 0.8rem; }
+    }
+
+    /* Bottom nav: pastikan jelas terangkat di atas safe-area */
+    .bottom-nav { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+
+    /* Sembunyikan caret panah pada input number/date di mobile yg memberi tampilan canggung */
+    input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.6; }
+
+    /* Modal: pas di layar HP kecil */
+    @media (max-width: 480px) {
+      .modal-box { padding: 1.5rem; border-radius: 16px; }
+    }
   </style>
 </head>
 
@@ -615,11 +680,6 @@
           <input id="uf-hp" type="tel" class="field field-light" style="padding:0.55rem 0.85rem;font-size:0.85rem;" placeholder="08xx" />
         </div>
         <div>
-          <label style="display:block;font-size:0.7rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;text-transform:uppercase;letter-spacing:0.05em;">Departemen</label>
-          <input id="uf-dept" type="text" class="field field-light" style="padding:0.55rem 0.85rem;font-size:0.85rem;" placeholder="HRD, IT, Finance..." list="dept-list" />
-          <datalist id="dept-list"></datalist>
-        </div>
-        <div>
           <label style="display:block;font-size:0.7rem;font-weight:600;color:var(--text-muted);margin-bottom:0.25rem;text-transform:uppercase;letter-spacing:0.05em;">Jabatan</label>
           <input id="uf-jabatan" type="text" class="field field-light" style="padding:0.55rem 0.85rem;font-size:0.85rem;" placeholder="Staff, Manager..." />
         </div>
@@ -708,7 +768,7 @@
             <span style="position:absolute;left:0.9rem;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.35);">
               <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/></svg>
             </span>
-            <input id="login-id" type="text" inputmode="numeric" placeholder="Masukkan ID karyawan" class="field field-dark" style="padding-left:2.6rem;" autocomplete="username" />
+            <input id="login-id" type="text" inputmode="text" autocapitalize="characters" placeholder="Masukkan ID karyawan" class="field field-dark" style="padding-left:2.6rem;" autocomplete="username" />
           </div>
         </div>
 
@@ -809,14 +869,14 @@
             <div style="flex:1;padding:0.75rem;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
               <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
                 <span class="status-dot" style="background:#10b981;"></span>
-                <span style="font-size:0.75rem;font-weight:600;color:#15803d;text-transform:uppercase;letter-spacing:0.04em;">Check-In</span>
+                <span style="font-size:0.75rem;font-weight:600;color:#15803d;text-transform:uppercase;letter-spacing:0.04em;">Jam Masuk</span>
               </div>
               <p id="status-checkin" style="font-size:0.9rem;font-weight:600;color:#166534;margin:0;font-family:'JetBrains Mono',monospace;">—</p>
             </div>
             <div style="flex:1;padding:0.75rem;background:#fff1f2;border-radius:10px;border:1px solid #fecdd3;">
               <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
                 <span class="status-dot" style="background:#ef4444;"></span>
-                <span style="font-size:0.75rem;font-weight:600;color:#b91c1c;text-transform:uppercase;letter-spacing:0.04em;">Check-Out</span>
+                <span style="font-size:0.75rem;font-weight:600;color:#b91c1c;text-transform:uppercase;letter-spacing:0.04em;">Jam Pulang</span>
               </div>
               <p id="status-checkout" style="font-size:0.9rem;font-weight:600;color:#991b1b;margin:0;font-family:'JetBrains Mono',monospace;">—</p>
             </div>
@@ -827,11 +887,11 @@
         <div class="anim-slide" style="display:flex;flex-direction:column;gap:0.875rem;width:100%;">
           <button id="btn-checkin" onclick="startAbsensiFlow('Check-In')" class="btn btn-checkin" style="width:100%;border-radius:14px;">
             <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
-            Check-In
+            Masuk
           </button>
           <button id="btn-checkout" onclick="startAbsensiFlow('Check-Out')" class="btn btn-checkout" style="width:100%;border-radius:14px;">
             <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-            Check-Out
+            Pulang
           </button>
         </div>
 
@@ -1049,9 +1109,6 @@
         <!-- Filters -->
         <div style="padding:0.75rem 1.25rem;display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border-lighter);background:var(--bg-card-hover);">
           <input id="users-search" type="text" placeholder="Cari nama atau ID..." class="field field-light" style="flex:1;min-width:180px;padding:0.5rem 0.85rem;font-size:0.82rem;" oninput="renderUsersTable()" />
-          <select id="users-filter-dept" class="field field-light" style="padding:0.5rem 0.85rem;font-size:0.82rem;width:auto;min-width:140px;" onchange="renderUsersTable()">
-            <option value="">Semua Departemen</option>
-          </select>
           <select id="users-filter-status" class="field field-light" style="padding:0.5rem 0.85rem;font-size:0.82rem;width:auto;min-width:120px;" onchange="renderUsersTable()">
             <option value="active">Aktif</option>
             <option value="inactive">Nonaktif</option>
@@ -1060,7 +1117,7 @@
         </div>
         <div class="scroll-x">
           <table class="data-table">
-            <thead><tr><th>ID</th><th>Nama</th><th>Departemen</th><th>Jabatan</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead>
+            <thead><tr><th>ID</th><th>Nama</th><th>Jabatan</th><th>Role</th><th>Status</th><th>Aksi</th></tr></thead>
             <tbody id="users-tbody"></tbody>
           </table>
         </div>
@@ -1097,13 +1154,10 @@
           <input id="absensi-search" type="text" placeholder="Cari nama / ID..." class="field field-light" style="padding:0.5rem 0.85rem;font-size:0.82rem;" oninput="renderAbsensiTable()" />
           <input id="absensi-from" type="date" class="field field-light" style="padding:0.5rem 0.85rem;font-size:0.82rem;" onchange="loadAbsensiRange()" title="Dari Tanggal" />
           <input id="absensi-to" type="date" class="field field-light" style="padding:0.5rem 0.85rem;font-size:0.82rem;" onchange="loadAbsensiRange()" title="Sampai Tanggal" />
-          <select id="absensi-filter-dept" class="field field-light" style="padding:0.5rem 0.85rem;font-size:0.82rem;" onchange="renderAbsensiTable()">
-            <option value="">Semua Departemen</option>
-          </select>
           <select id="absensi-filter-tipe" class="field field-light" style="padding:0.5rem 0.85rem;font-size:0.82rem;" onchange="renderAbsensiTable()">
             <option value="">Semua Tipe</option>
-            <option value="Check-In">Check-In</option>
-            <option value="Check-Out">Check-Out</option>
+            <option value="Check-In">Masuk</option>
+            <option value="Check-Out">Pulang</option>
           </select>
         </div>
         <div class="scroll-x">
@@ -1606,11 +1660,11 @@
           icon: `<div style="width:56px;height:56px;border-radius:50%;background:rgba(239,68,68,0.12);display:inline-flex;align-items:center;justify-content:center;">
             <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#ef4444" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
           </div>`,
-          title: 'Konfirmasi Check-Out',
+          title: 'Konfirmasi Pulang',
           message: 'Pastikan Anda sudah selesai bekerja hari ini. Proses ini memerlukan selfie dan lokasi GPS.',
           actions: [
             { label: 'Batal', class: 'btn-outline' },
-            { label: 'Lanjut Check-Out', class: 'btn-danger', onClick: () => executeAbsensi(tipe, btn, origHtml) }
+            { label: 'Lanjut Pulang', class: 'btn-danger', onClick: () => executeAbsensi(tipe, btn, origHtml) }
           ]
         });
         return;
@@ -1945,12 +1999,12 @@
 
     async function loadUsers() {
       const tbody = document.getElementById('users-tbody');
-      showSkeleton(tbody, 7);
+      showSkeleton(tbody, 6);
 
       try {
         const res = await apiCall({ action: 'getUsers' });
         if (!res.success) {
-          tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#ef4444;padding:2rem;">${escHtml(res.message)}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#ef4444;padding:2rem;">${escHtml(res.message)}</td></tr>`;
           return;
         }
 
@@ -1959,42 +2013,22 @@
           nama        : u.nama,
           email       : u.email || '',
           no_hp       : u.no_hp || '',
-          departemen  : u.departemen || '',
           jabatan     : u.jabatan || '',
           tanggal_masuk: u.tanggal_masuk || '',
           role        : u.role || 'Karyawan',
           status      : (u.status || 'active').toLowerCase()  // 'active' | 'inactive'
         }));
 
-        // Refresh department dropdowns (users + absensi)
-        refreshDepartemenLists();
         _usersPage = 1;
         renderUsersTable();
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#ef4444;padding:2rem;">${escHtml(err.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#ef4444;padding:2rem;">${escHtml(err.message)}</td></tr>`;
       }
-    }
-
-    function refreshDepartemenLists() {
-      const depts = [...new Set(_allUsers.map(u => u.departemen).filter(Boolean))].sort();
-      // Filter selects
-      ['users-filter-dept', 'absensi-filter-dept'].forEach(id => {
-        const sel = document.getElementById(id);
-        if (!sel) return;
-        const cur = sel.value;
-        sel.innerHTML = '<option value="">Semua Departemen</option>' +
-          depts.map(d => `<option value="${escHtml(d)}">${escHtml(d)}</option>`).join('');
-        sel.value = cur;
-      });
-      // Datalist for form
-      const dl = document.getElementById('dept-list');
-      if (dl) dl.innerHTML = depts.map(d => `<option value="${escHtml(d)}">`).join('');
     }
 
     function renderUsersTable() {
       const tbody  = document.getElementById('users-tbody');
       const search = (document.getElementById('users-search')?.value || '').toLowerCase().trim();
-      const dept   = document.getElementById('users-filter-dept')?.value || '';
       const status = document.getElementById('users-filter-status')?.value || '';
 
       let filtered = _allUsers.filter(u => {
@@ -2002,7 +2036,6 @@
           const hay = (u.id_karyawan + ' ' + u.nama).toLowerCase();
           if (!hay.includes(search)) return false;
         }
-        if (dept && u.departemen !== dept) return false;
         if (status && u.status !== status) return false;
         return true;
       });
@@ -2018,7 +2051,7 @@
       const pageItems = filtered.slice(start, start + USERS_PAGE_SIZE);
 
       if (pageItems.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem;">Tidak ada data sesuai filter.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">Tidak ada data sesuai filter.</td></tr>';
       } else {
         tbody.innerHTML = pageItems.map(u => {
           const isAdmin = u.role === 'Admin';
@@ -2033,7 +2066,6 @@
             <tr>
               <td><code style="font-size:0.78rem;background:var(--bg-card-hover);padding:0.15rem 0.4rem;border-radius:4px;">${idKar}</code></td>
               <td style="font-weight:500;color:var(--text-primary);">${escHtml(u.nama)}</td>
-              <td style="font-size:0.8rem;">${escHtml(u.departemen) || '<span style="color:var(--text-muted);">—</span>'}</td>
               <td style="font-size:0.8rem;">${escHtml(u.jabatan) || '<span style="color:var(--text-muted);">—</span>'}</td>
               <td>${roleBadge}</td>
               <td>${statusBadge}</td>
@@ -2083,7 +2115,7 @@
 
       title.textContent = mode === 'edit' ? 'Edit Karyawan' : 'Tambah Karyawan';
       // Reset
-      ['uf-id','uf-nama','uf-email','uf-hp','uf-dept','uf-jabatan','uf-pin','uf-tgl'].forEach(f => {
+      ['uf-id','uf-nama','uf-email','uf-hp','uf-jabatan','uf-pin','uf-tgl'].forEach(f => {
         document.getElementById(f).value = '';
       });
       document.getElementById('uf-role').value = 'Karyawan';
@@ -2097,7 +2129,6 @@
           document.getElementById('uf-nama').value    = u.nama;
           document.getElementById('uf-email').value   = u.email;
           document.getElementById('uf-hp').value      = u.no_hp;
-          document.getElementById('uf-dept').value    = u.departemen;
           document.getElementById('uf-jabatan').value = u.jabatan;
           document.getElementById('uf-tgl').value     = u.tanggal_masuk;
           document.getElementById('uf-role').value    = u.role;
@@ -2121,7 +2152,6 @@
       const nama    = document.getElementById('uf-nama').value.trim();
       const email   = document.getElementById('uf-email').value.trim();
       const no_hp   = document.getElementById('uf-hp').value.trim();
-      const dept    = document.getElementById('uf-dept').value.trim();
       const jabatan = document.getElementById('uf-jabatan').value.trim();
       const pin     = document.getElementById('uf-pin').value.trim();
       const tgl     = document.getElementById('uf-tgl').value;
@@ -2140,7 +2170,7 @@
         const action = _editingUserId ? 'updateUser' : 'addUser';
         const payload = {
           action, id_karyawan: id, nama, email, no_hp,
-          departemen: dept, jabatan, tanggal_masuk: tgl, role
+          jabatan, tanggal_masuk: tgl, role
         };
         if (pin) payload.pin = pin;
 
@@ -2294,12 +2324,7 @@
 
     function getFilteredAbsensi() {
       const search = (document.getElementById('absensi-search')?.value || '').toLowerCase().trim();
-      const dept   = document.getElementById('absensi-filter-dept')?.value || '';
       const tipe   = document.getElementById('absensi-filter-tipe')?.value || '';
-
-      // Build a quick department lookup from _allUsers
-      const deptOf = {};
-      _allUsers.forEach(u => { deptOf[u.id_karyawan] = u.departemen || ''; });
 
       return _allAbsensi.filter(r => {
         if (search) {
@@ -2307,10 +2332,6 @@
           if (!hay.includes(search)) return false;
         }
         if (tipe && r.tipe_absen !== tipe) return false;
-        if (dept) {
-          const d = r.departemen || deptOf[r.id_karyawan] || '';
-          if (d !== dept) return false;
-        }
         return true;
       });
     }
@@ -2334,8 +2355,8 @@
           const time    = tsRaw.length >= 19 ? tsRaw.substring(11, 19) : '—';
           const isCin = r.tipe_absen === 'Check-In';
           const badge = isCin
-            ? '<span class="badge badge-checkin">Check-In</span>'
-            : '<span class="badge badge-checkout">Check-Out</span>';
+            ? '<span class="badge badge-checkin">Masuk</span>'
+            : '<span class="badge badge-checkout">Pulang</span>';
 
           let keterangan = '';
           if (isCin) {
@@ -2408,21 +2429,18 @@
       const filtered = getFilteredAbsensi();
       if (!filtered.length) { showToast('Tidak ada data untuk diekspor.', 'error'); return; }
 
-      const deptOf = {};
-      _allUsers.forEach(u => { deptOf[u.id_karyawan] = u.departemen || ''; });
-
-      const header = ['Tanggal','Waktu','ID Karyawan','Nama','Departemen','Tipe','Status Cerdas','Dalam Radius','Jarak (m)','Latitude','Longitude','Link Maps'];
+      const header = ['Tanggal','Waktu','ID Karyawan','Nama','Tipe','Status Cerdas','Dalam Radius','Jarak (m)','Latitude','Longitude','Link Maps'];
       const rows = [header];
       filtered.forEach(r => {
         const ts = r.timestamp || '';
         const tanggal = ts.substring(0,10);
         const waktu   = ts.length >= 19 ? ts.substring(11,19) : '';
         const status = r.tipe_absen === 'Check-In' ? (getAttendanceStatus(waktu, null)?.label || '') : '';
+        const tipeLabel = r.tipe_absen === 'Check-In' ? 'Masuk' : (r.tipe_absen === 'Check-Out' ? 'Pulang' : (r.tipe_absen || ''));
         rows.push([
           tanggal, waktu,
           r.id_karyawan, r.nama,
-          r.departemen || deptOf[r.id_karyawan] || '',
-          r.tipe_absen, status,
+          tipeLabel, status,
           r.in_radius === true ? 'Ya' : (r.in_radius === false ? 'Tidak' : ''),
           r.distance || '',
           r.latitude || '', r.longitude || '',
@@ -2606,7 +2624,7 @@
           <span style="font-size:1.15rem;width:26px;text-align:center;">${medals[i] || (i+1)}</span>
           <div style="flex:1;min-width:0;">
             <p style="font-size:0.85rem;font-weight:600;color:var(--text-primary);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(p.nama || p.id_karyawan)}</p>
-            <p style="font-size:0.7rem;color:var(--text-muted);margin:0;">${escHtml(p.departemen || '')}</p>
+            <p style="font-size:0.7rem;color:var(--text-muted);margin:0;">${escHtml(p.id_karyawan || '')}</p>
           </div>
           <div style="text-align:right;">
             <p style="font-size:0.95rem;font-weight:700;color:#10b981;margin:0;">${p.tepat_waktu ?? p.score ?? 0}</p>
@@ -2698,7 +2716,7 @@
       if (h === 7 && m === 55) {
         const k = 'absensi_reminder_in_' + dayKey;
         if (!localStorage.getItem(k)) {
-          fireReminder('Jangan lupa Check-In!', 'Saatnya melakukan Check-In hari ini.');
+          fireReminder('Jangan lupa absen Masuk!', 'Saatnya melakukan absen Masuk hari ini.');
           localStorage.setItem(k, '1');
         }
       }
@@ -2706,7 +2724,7 @@
       if (h === 16 && m === 55) {
         const k = 'absensi_reminder_out_' + dayKey;
         if (!localStorage.getItem(k)) {
-          fireReminder('Jangan lupa Check-Out!', 'Saatnya melakukan Check-Out hari ini.');
+          fireReminder('Jangan lupa absen Pulang!', 'Saatnya melakukan absen Pulang hari ini.');
           localStorage.setItem(k, '1');
         }
       }

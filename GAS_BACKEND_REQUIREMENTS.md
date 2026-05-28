@@ -7,14 +7,19 @@ Frontend sudah aman terhadap backend lama: kalau action belum ada, halaman tetap
 jalan (Dashboard fallback ke kalkulasi lokal, Absensi fallback ke `getTodayAbsensi`).
 Tapi untuk fitur penuh, tambahkan action di bawah.
 
+> ⚠ **MIGRASI:** Kolom `departemen` SUDAH DIHAPUS dari aplikasi (sheet `Users` &
+> `Absensi`, semua endpoint, dan UI admin). Kalau sheet existing masih punya
+> kolom `departemen`, **hapus kolomnya** atau biarkan kosong — frontend tidak
+> akan mengirim/membaca field ini lagi. Lihat bagian "Migrasi" di bawah.
+
 ---
 
-## 1. Sheet "Users" — Kolom Tambahan
+## 1. Sheet "Users" — Skema Kolom
 
-Tambahkan kolom (kalau belum ada) di sheet `Users`:
+Skema kolom sheet `Users` (urutan boleh menyesuaikan, yang penting nama header sama):
 
-| id_karyawan | nama | pin | role | email | no_hp | departemen | jabatan | tanggal_masuk | status |
-|-------------|------|-----|------|-------|-------|------------|---------|---------------|--------|
+| id_karyawan | nama | pin | role | email | no_hp | jabatan | tanggal_masuk | status |
+|-------------|------|-----|------|-------|-------|---------|---------------|--------|
 
 - `status` valuenya: `active` atau `inactive` (default `active`)
 - `tanggal_masuk` format: `YYYY-MM-DD`
@@ -24,9 +29,8 @@ pesan: `"Akun Anda dinonaktifkan. Hubungi admin."`
 
 ---
 
-## 2. Action: `getUsers` — Tambahkan Field
+## 2. Action: `getUsers` — Field yang Dikembalikan
 
-Response sekarang harus include semua kolom baru:
 ```json
 {
   "success": true,
@@ -37,7 +41,6 @@ Response sekarang harus include semua kolom baru:
       "role": "Karyawan",
       "email": "budi@fsr.com",
       "no_hp": "08123456789",
-      "departemen": "IT",
       "jabatan": "Staff",
       "tanggal_masuk": "2024-01-15",
       "status": "active"
@@ -45,6 +48,8 @@ Response sekarang harus include semua kolom baru:
   ]
 }
 ```
+
+> Field `departemen` tidak lagi diperlukan dan akan diabaikan oleh frontend.
 
 ---
 
@@ -58,7 +63,6 @@ Response sekarang harus include semua kolom baru:
   "nama": "Siti",
   "email": "siti@fsr.com",
   "no_hp": "0812...",
-  "departemen": "Finance",
   "jabatan": "Manager",
   "tanggal_masuk": "2026-05-28",
   "role": "Karyawan",
@@ -173,7 +177,6 @@ Response sekarang harus include semua kolom baru:
       "timestamp": "2026-05-28 08:13:42",
       "id_karyawan": "EMP001",
       "nama": "Budi",
-      "departemen": "IT",
       "tipe_absen": "Check-In",
       "latitude": -5.395,
       "longitude": 105.220,
@@ -184,9 +187,9 @@ Response sekarang harus include semua kolom baru:
   ]
 }
 ```
-> Tambahkan field `departemen` di setiap record kalau bisa (lookup dari sheet Users
-> saat write atau saat read). Frontend juga punya fallback dari user list, tapi
-> server-side lebih akurat.
+> Catatan: `tipe_absen` tetap menggunakan nilai `"Check-In"` / `"Check-Out"` di
+> backend agar kompatibel dengan data lama. UI menampilkannya sebagai
+> "Masuk" / "Pulang".
 
 ---
 
@@ -216,11 +219,11 @@ Response sekarang harus include semua kolom baru:
       { "date": "2026-05-28", "label": "Kam", "hadir": 33, "telat": 5, "alpa": 4 }
     ],
     "leaderboard": [
-      { "id_karyawan": "EMP010", "nama": "Andi",  "departemen": "IT",      "tepat_waktu": 22 },
-      { "id_karyawan": "EMP005", "nama": "Rina",  "departemen": "HRD",     "tepat_waktu": 21 },
-      { "id_karyawan": "EMP012", "nama": "Joko",  "departemen": "Finance", "tepat_waktu": 20 },
-      { "id_karyawan": "EMP003", "nama": "Wati",  "departemen": "IT",      "tepat_waktu": 19 },
-      { "id_karyawan": "EMP008", "nama": "Doni",  "departemen": "Ops",     "tepat_waktu": 18 }
+      { "id_karyawan": "EMP010", "nama": "Andi",  "tepat_waktu": 22 },
+      { "id_karyawan": "EMP005", "nama": "Rina",  "tepat_waktu": 21 },
+      { "id_karyawan": "EMP012", "nama": "Joko",  "tepat_waktu": 20 },
+      { "id_karyawan": "EMP003", "nama": "Wati",  "tepat_waktu": 19 },
+      { "id_karyawan": "EMP008", "nama": "Doni",  "tepat_waktu": 18 }
     ]
   }
 }
@@ -244,6 +247,27 @@ Kalau mau, bikin trigger time-based di GAS yang setiap pagi kirim ringkasan:
 
 ---
 
+## 11. Migrasi: Hapus Kolom `departemen`
+
+Untuk sheet `Users` & `Absensi` lama yang masih punya kolom `departemen`:
+
+**Opsi A — Hapus kolom (rekomendasi):**
+1. Buka sheet di Google Sheets.
+2. Klik header kolom `departemen` → klik kanan → "Delete column".
+3. Lakukan untuk sheet `Users` dan sheet `Absensi` (kalau ada).
+
+**Opsi B — Biarkan saja:**
+- Frontend tidak akan mengirim/membaca field `departemen` lagi, jadi kolom ini
+  akan berisi nilai lama (read-only). Tidak akan ada error.
+
+**Update kode GAS yang masih merefer ke `departemen`:**
+- Hapus baris `setValue(departemen)` / `getValue` untuk kolom departemen di
+  fungsi `addUser`, `updateUser`, `submitAbsensi`, `getUsers`, `getAbsensiRange`,
+  dan `getDashboardStats` (di leaderboard).
+- Hapus parameter `departemen` di handler request.
+
+---
+
 ## File Static yang Perlu Dipublikasikan
 
 PWA butuh file ini bisa diakses publik (selain `index.html`):
@@ -263,14 +287,17 @@ bisa dipanggil dari domain manapun.
 Setelah deploy backend baru, cek di urutan ini:
 
 1. [ ] Login user lama masih jalan
-2. [ ] Tab Overview di admin: KPI muncul, chart kebaca, leaderboard ada isi
-3. [ ] Tab Karyawan: search bekerja, filter departemen muncul, tombol "Tambah Karyawan" buka modal
-4. [ ] Add karyawan baru → muncul di tabel
-5. [ ] Edit karyawan → field ke-update di sheet
-6. [ ] Reset PIN → user terima email, PIN sheet ter-update
-7. [ ] Nonaktifkan karyawan → user tidak bisa login lagi
-8. [ ] Tab Absensi: filter tanggal range jalan, export CSV download file
-9. [ ] Tombol "Laporan Bulan Ini" download CSV bulan berjalan
-10. [ ] Login: klik "Lupa PIN?" → modal muncul → submit kirim email ke admin
-11. [ ] PWA: buka di Chrome mobile → muncul "Add to Home Screen"
-12. [ ] Setelah install: jam 07:55 WIB notifikasi muncul (tab harus pernah dibuka hari itu)
+2. [ ] Login bisa input ID dengan huruf (mis. `EMP001`) — keyboard HP harus tampil alfanumerik
+3. [ ] Tab Overview di admin: KPI muncul, chart kebaca, leaderboard ada isi
+4. [ ] Tab Karyawan: search bekerja, tombol "Tambah Karyawan" buka modal (tidak ada field Departemen)
+5. [ ] Add karyawan baru → muncul di tabel (kolom Departemen tidak ada)
+6. [ ] Edit karyawan → field ke-update di sheet
+7. [ ] Reset PIN → user terima email, PIN sheet ter-update
+8. [ ] Nonaktifkan karyawan → user tidak bisa login lagi
+9. [ ] Tab Absensi: filter tanggal range jalan, badge tampil "Masuk"/"Pulang"
+10. [ ] Export CSV download file (header tanpa kolom Departemen)
+11. [ ] Tombol "Laporan Bulan Ini" download CSV bulan berjalan
+12. [ ] Login: klik "Lupa PIN?" → modal muncul → submit kirim email ke admin
+13. [ ] PWA: buka di Chrome mobile → muncul "Add to Home Screen"
+14. [ ] Halaman Karyawan di HP: tombol "Masuk" / "Pulang", status "JAM MASUK" / "JAM PULANG"
+15. [ ] Setelah install: jam 07:55 WIB notifikasi "Jangan lupa absen Masuk!" muncul
