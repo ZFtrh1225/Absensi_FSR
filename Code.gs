@@ -59,13 +59,13 @@
 // ════════════════════════════════════════════════════════════
 
 const SPREADSHEET_ID    = '147vlK6BxUrEOYqD27MedD0avqqjI8Ed3mMA1Z95U3VI';
-const SELFIE_FOLDER_ID  = '';   // <── PASTE Google Drive Folder ID here for selfie storage
+const SELFIE_FOLDER_ID  = '1xpYzOx6t4mqHNlkvtfM6xb33KfvF7qSR';   // <── PASTE Google Drive Folder ID here for selfie storage
 const TZ                = 'Asia/Jakarta';
 
 // Smart-status thresholds (kept identical to frontend)
-const JAM_MASUK_HHMM    = '08:00';
+const JAM_MASUK_HHMM    = '08:15';
 const JAM_PULANG_HHMM   = '17:00';
-const TOLERANSI_MENIT   = 15;
+const TOLERANSI_MENIT   = 45;
 
 // ════════════════════════════════════════════════════════════
 //  ENTRY POINTS
