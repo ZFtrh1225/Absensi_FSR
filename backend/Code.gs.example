@@ -1,9 +1,10 @@
 /**
  * REFERENSI HANDLER GAS — copy-paste ke Apps Script Anda untuk
- * memperbaiki dua isu:
- *   1) "Failed to fetch" saat klik Kirim Permintaan di "Lupa PIN"
- *      → Backend belum punya handler `requestPinReset`, atau handler-nya
- *        crash karena `MailApp.sendEmail` belum di-authorize.
+ * memperbaiki isu yang muncul di frontend:
+ *
+ *   1) "Action tidak dikenali: addUser / updateUser / setUserStatus / resetPin"
+ *      → Router doGet/doPost di GAS Anda belum punya cabang untuk action-action
+ *        baru (tab Karyawan butuh CRUD penuh). Disertakan di bawah.
  *   2) "Belum ada data leaderboard. Backend perlu support action getDashboardStats."
  *      → Frontend SEKARANG sudah menghitung leaderboard sendiri sebagai
  *        fallback, jadi handler `getDashboardStats` BERSIFAT OPSIONAL.
@@ -14,15 +15,15 @@
  *   1) Buka script Apps Script Anda (Tools → Script editor di Sheets).
  *   2) Tambahkan/merge fungsi-fungsi di bawah ke Code.gs Anda.
  *   3) Pastikan router `doGet` / `doPost` (atau `handleRequest`) sudah
- *      meneruskan action `requestPinReset` & `getDashboardStats` ke
- *      handler yang sesuai (lihat contoh `routeAction_` paling bawah).
- *   4) Klik Run → pilih `requestPinReset` (sekali saja) → di dialog otorisasi
- *      Google, **berikan izin Gmail/MailApp**. Tanpa langkah ini, handler
- *      akan crash di runtime dan menghasilkan "Failed to fetch" di frontend.
+ *      meneruskan action `addUser`, `updateUser`, `setUserStatus`, `resetPin`,
+ *      dan `getDashboardStats` ke handler yang sesuai (lihat contoh
+ *      `routeAction_` paling bawah).
+ *   4) Klik Run → pilih `addUser` (sekali saja) → di dialog otorisasi Google,
+ *      **berikan izin Spreadsheet**. Untuk `resetPin` tambahan: izin **Gmail/MailApp**.
+ *      Tanpa langkah ini, handler akan crash di runtime.
  *   5) Deploy ulang Web App (Deploy → Manage Deployments → Edit → New version).
  *
  * SCRIPT PROPERTIES yang dibaca:
- *   - ADMIN_EMAIL  (wajib untuk requestPinReset; tujuan email permintaan)
  *   - JAM_MASUK    (default "08:15")
  *   - TOLERANSI_MENIT (default 45)
  *
@@ -31,90 +32,213 @@
 
 
 /* ════════════════════════════════════════════════════════
-   1) requestPinReset — dipanggil dari modal "Lupa PIN"
+   1) addUser — dipanggil dari modal "Tambah Karyawan"
    ════════════════════════════════════════════════════════ */
-function requestPinReset(p) {
+function addUser(p) {
   try {
-    var idKar = String(p.id_karyawan || '').trim();
-    var email = String(p.email || '').trim().toLowerCase();
-    if (!idKar || !email) {
-      return { success: false, message: 'ID Karyawan dan email wajib diisi.' };
+    var idKar    = String(p.id_karyawan || '').trim();
+    var nama     = String(p.nama || '').trim();
+    var email    = String(p.email || '').trim();
+    var noHp     = String(p.no_hp || '').trim();
+    var jabatan  = String(p.jabatan || '').trim();
+    var tglMasuk = String(p.tanggal_masuk || '').trim();
+    var role     = String(p.role || 'Karyawan').trim();
+    var pin      = String(p.pin || '').trim();
+
+    if (!idKar || !nama) {
+      return { success: false, message: 'ID Karyawan dan Nama wajib diisi.' };
+    }
+    if (!pin || !/^\d{4,6}$/.test(pin)) {
+      return { success: false, message: 'PIN default harus 4-6 digit angka.' };
     }
 
-    // Verifikasi: ID & email harus cocok di sheet Users
     var sh = SpreadsheetApp.getActive().getSheetByName('Users');
     if (!sh) return { success: false, message: 'Sheet Users tidak ditemukan.' };
 
-    var values = sh.getDataRange().getValues();
-    var header = values[0].map(function (h) { return String(h).trim().toLowerCase(); });
-    var idxId    = header.indexOf('id_karyawan');
-    var idxNama  = header.indexOf('nama');
-    var idxEmail = header.indexOf('email');
-    if (idxId < 0 || idxEmail < 0) {
-      return { success: false, message: 'Kolom id_karyawan / email tidak ada di sheet Users.' };
+    var ctx = _readUsersSheet_(sh);
+    // Cek duplikat ID
+    for (var i = 1; i < ctx.values.length; i++) {
+      if (String(ctx.values[i][ctx.idx.id_karyawan]).trim() === idKar) {
+        return { success: false, message: 'ID "' + idKar + '" sudah terdaftar.' };
+      }
     }
 
-    var matched = null;
-    for (var i = 1; i < values.length; i++) {
-      var row = values[i];
-      if (String(row[idxId]).trim() === idKar &&
-          String(row[idxEmail]).trim().toLowerCase() === email) {
-        matched = { nama: row[idxNama] || idKar };
+    // Bangun row baru sesuai urutan kolom sheet
+    var row = new Array(ctx.header.length).fill('');
+    _setCol_(row, ctx.idx, 'id_karyawan',   idKar);
+    _setCol_(row, ctx.idx, 'nama',          nama);
+    _setCol_(row, ctx.idx, 'pin',           pin);            // ⚠ Plaintext. Untuk produksi sebaiknya hash.
+    _setCol_(row, ctx.idx, 'role',          role || 'Karyawan');
+    _setCol_(row, ctx.idx, 'email',         email);
+    _setCol_(row, ctx.idx, 'no_hp',         noHp);
+    _setCol_(row, ctx.idx, 'jabatan',       jabatan);
+    _setCol_(row, ctx.idx, 'tanggal_masuk', tglMasuk);
+    _setCol_(row, ctx.idx, 'status',        'active');
+    sh.appendRow(row);
+
+    return { success: true, message: 'Karyawan ditambahkan.' };
+  } catch (e) {
+    return { success: false, message: 'Gagal: ' + (e && e.message ? e.message : e) };
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════
+   2) updateUser — dipanggil dari modal "Edit Karyawan"
+   ════════════════════════════════════════════════════════ */
+function updateUser(p) {
+  try {
+    var idKar = String(p.id_karyawan || '').trim();
+    if (!idKar) return { success: false, message: 'ID Karyawan wajib diisi.' };
+
+    var sh = SpreadsheetApp.getActive().getSheetByName('Users');
+    if (!sh) return { success: false, message: 'Sheet Users tidak ditemukan.' };
+
+    var ctx = _readUsersSheet_(sh);
+    var rowNum = -1;
+    for (var i = 1; i < ctx.values.length; i++) {
+      if (String(ctx.values[i][ctx.idx.id_karyawan]).trim() === idKar) {
+        rowNum = i + 1;          // sheet rows are 1-based
         break;
       }
     }
-    if (!matched) {
-      return { success: false, message: 'ID Karyawan dan email tidak cocok dengan data terdaftar.' };
+    if (rowNum < 0) return { success: false, message: 'Karyawan "' + idKar + '" tidak ditemukan.' };
+
+    // Update field yang dikirim (yang tidak ada di payload diabaikan, tidak di-overwrite)
+    var updates = {
+      nama          : 'nama',
+      email         : 'email',
+      no_hp         : 'no_hp',
+      jabatan       : 'jabatan',
+      tanggal_masuk : 'tanggal_masuk',
+      role          : 'role',
+    };
+    Object.keys(updates).forEach(function (k) {
+      if (p[k] !== undefined && p[k] !== null) {
+        var col = ctx.idx[updates[k]];
+        if (col >= 0) sh.getRange(rowNum, col + 1).setValue(p[k]);
+      }
+    });
+
+    // PIN opsional: hanya di-update kalau dikirim
+    if (p.pin && /^\d{4,6}$/.test(String(p.pin))) {
+      var pinCol = ctx.idx.pin;
+      if (pinCol >= 0) sh.getRange(rowNum, pinCol + 1).setValue(String(p.pin));
     }
 
-    // Catat permintaan ke sheet PinResetRequests (auto-create kalau belum ada)
-    var ss = SpreadsheetApp.getActive();
-    var logSh = ss.getSheetByName('PinResetRequests');
-    if (!logSh) {
-      logSh = ss.insertSheet('PinResetRequests');
-      logSh.appendRow(['timestamp', 'id_karyawan', 'nama', 'email', 'status']);
-    }
-    logSh.appendRow([new Date(), idKar, matched.nama, email, 'pending']);
+    return { success: true, message: 'Data karyawan diperbarui.' };
+  } catch (e) {
+    return { success: false, message: 'Gagal: ' + (e && e.message ? e.message : e) };
+  }
+}
 
-    // Kirim email ke admin
-    var props = PropertiesService.getScriptProperties();
-    var adminEmail = props.getProperty('ADMIN_EMAIL');
-    if (adminEmail) {
+
+/* ════════════════════════════════════════════════════════
+   3) setUserStatus — soft delete / aktifkan kembali
+   ════════════════════════════════════════════════════════ */
+function setUserStatus(p) {
+  try {
+    var idKar = String(p.id_karyawan || '').trim();
+    var st    = String(p.status || '').toLowerCase();
+    if (!idKar)                            return { success: false, message: 'ID Karyawan wajib diisi.' };
+    if (st !== 'active' && st !== 'inactive') return { success: false, message: 'Status harus "active" atau "inactive".' };
+
+    var sh = SpreadsheetApp.getActive().getSheetByName('Users');
+    if (!sh) return { success: false, message: 'Sheet Users tidak ditemukan.' };
+
+    var ctx = _readUsersSheet_(sh);
+    var statusCol = ctx.idx.status;
+    if (statusCol < 0) return { success: false, message: 'Kolom status tidak ada di sheet Users.' };
+
+    for (var i = 1; i < ctx.values.length; i++) {
+      if (String(ctx.values[i][ctx.idx.id_karyawan]).trim() === idKar) {
+        sh.getRange(i + 1, statusCol + 1).setValue(st);
+        return { success: true, message: st === 'inactive' ? 'Karyawan dinonaktifkan.' : 'Karyawan diaktifkan.' };
+      }
+    }
+    return { success: false, message: 'Karyawan "' + idKar + '" tidak ditemukan.' };
+  } catch (e) {
+    return { success: false, message: 'Gagal: ' + (e && e.message ? e.message : e) };
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════
+   4) resetPin — generate PIN acak + (opsional) kirim email
+   ════════════════════════════════════════════════════════ */
+function resetPin(p) {
+  try {
+    var idKar = String(p.id_karyawan || '').trim();
+    if (!idKar) return { success: false, message: 'ID Karyawan wajib diisi.' };
+
+    var sh = SpreadsheetApp.getActive().getSheetByName('Users');
+    if (!sh) return { success: false, message: 'Sheet Users tidak ditemukan.' };
+
+    var ctx = _readUsersSheet_(sh);
+    var rowNum = -1, namaUser = idKar, emailUser = '';
+    for (var i = 1; i < ctx.values.length; i++) {
+      if (String(ctx.values[i][ctx.idx.id_karyawan]).trim() === idKar) {
+        rowNum = i + 1;
+        namaUser  = ctx.values[i][ctx.idx.nama]  || idKar;
+        emailUser = ctx.values[i][ctx.idx.email] || '';
+        break;
+      }
+    }
+    if (rowNum < 0) return { success: false, message: 'Karyawan "' + idKar + '" tidak ditemukan.' };
+
+    var newPin = String(Math.floor(100000 + Math.random() * 900000));
+    sh.getRange(rowNum, ctx.idx.pin + 1).setValue(newPin);
+
+    // Coba kirim email — jika MailApp belum di-authorize, jangan crash.
+    var sentEmail = false;
+    if (emailUser) {
       try {
         MailApp.sendEmail({
-          to: adminEmail,
-          subject: 'Permintaan Reset PIN - ' + matched.nama + ' (' + idKar + ')',
+          to: emailUser,
+          subject: 'PIN Absensi FSR Anda Telah Direset',
           body:
-            'Halo Admin,\n\n' +
-            'Karyawan berikut meminta reset PIN:\n' +
-            '- ID  : ' + idKar + '\n' +
-            '- Nama: ' + matched.nama + '\n' +
-            '- Email: ' + email + '\n\n' +
-            'Buka admin panel Absensi FSR untuk memprosesnya (tab Karyawan → Reset PIN).',
+            'Halo ' + namaUser + ',\n\n' +
+            'PIN Absensi FSR Anda telah direset oleh admin.\n' +
+            'PIN baru: ' + newPin + '\n\n' +
+            'Mohon segera login dan ubah PIN Anda jika perlu.',
         });
-      } catch (mailErr) {
-        // Permintaan tetap tercatat di sheet, tapi email gagal terkirim.
-        // Kembalikan success:true supaya UX tidak buntu — admin tetap bisa
-        // lihat di sheet PinResetRequests.
-        return {
-          success: true,
-          message:
-            'Permintaan tercatat. Catatan: email otomatis ke admin gagal terkirim ' +
-            '(' + (mailErr && mailErr.message ? mailErr.message : 'unknown') + '). ' +
-            'Admin dapat memeriksa sheet PinResetRequests secara manual.',
-        };
-      }
+        sentEmail = true;
+      } catch (mailErr) { /* abaikan */ }
     }
 
     return {
       success: true,
-      message: 'Permintaan dikirim. Admin akan memproses dalam 1x24 jam.',
+      message: sentEmail ? 'PIN direset dan dikirim ke email.' : 'PIN direset. Silakan informasikan ke karyawan.',
+      new_pin: newPin,
     };
   } catch (e) {
-    // PENTING: jangan lempar error — selalu return JSON.
-    // Kalau lempar, GAS balas HTML → frontend dapat "Failed to fetch".
-    return { success: false, message: 'Gagal memproses: ' + (e && e.message ? e.message : e) };
+    return { success: false, message: 'Gagal: ' + (e && e.message ? e.message : e) };
   }
+}
+
+
+/* ════════════════════════════════════════════════════════
+   Helper sheet Users — pakai header lowercase secara konsisten
+   ════════════════════════════════════════════════════════ */
+function _readUsersSheet_(sh) {
+  var values = sh.getDataRange().getValues();
+  var header = (values[0] || []).map(function (h) { return String(h).trim().toLowerCase(); });
+  var idx = {
+    id_karyawan   : header.indexOf('id_karyawan'),
+    nama          : header.indexOf('nama'),
+    pin           : header.indexOf('pin'),
+    role          : header.indexOf('role'),
+    email         : header.indexOf('email'),
+    no_hp         : header.indexOf('no_hp'),
+    jabatan       : header.indexOf('jabatan'),
+    tanggal_masuk : header.indexOf('tanggal_masuk'),
+    status        : header.indexOf('status'),
+  };
+  return { values: values, header: header, idx: idx };
+}
+
+function _setCol_(row, idx, key, val) {
+  if (idx[key] >= 0) row[idx[key]] = val;
 }
 
 
@@ -256,7 +380,10 @@ function getDashboardStats() {
 function routeAction_(payload) {
   var action = payload && payload.action;
   switch (action) {
-    case 'requestPinReset':   return requestPinReset(payload);
+    case 'addUser':           return addUser(payload);
+    case 'updateUser':        return updateUser(payload);
+    case 'setUserStatus':     return setUserStatus(payload);
+    case 'resetPin':          return resetPin(payload);
     case 'getDashboardStats': return getDashboardStats();
     // ... action lain yang sudah Anda punya:
     // case 'login':            return login(payload);
@@ -267,14 +394,10 @@ function routeAction_(payload) {
     // case 'getMyMonthly':     return getMyMonthly(payload);
     // case 'submitIzin':       return submitIzin(payload);
     // case 'getMyIzin':        return getMyIzin(payload);
-    // case 'getPengajuan':     return getPengajuan();
+    // case 'getAllIzin':       return getAllIzin();
     // case 'updateIzinStatus': return updateIzinStatus(payload);
-    // case 'addUser':          return addUser(payload);
-    // case 'updateUser':       return updateUser(payload);
-    // case 'setUserStatus':    return setUserStatus(payload);
-    // case 'resetPin':         return resetPin(payload);
     default:
-      return { success: false, message: 'Unknown action: ' + action };
+      return { success: false, message: 'Action tidak dikenali: "' + action + '"' };
   }
 }
 

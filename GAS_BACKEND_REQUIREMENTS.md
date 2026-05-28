@@ -131,63 +131,40 @@ pesan: `"Akun Anda dinonaktifkan. Hubungi admin."`
 
 ---
 
-## 7. Action: `requestPinReset` (dari halaman login "Lupa PIN?")
+## 7. ⚠ Troubleshooting "Action tidak dikenali"
 
-**Request:**
-```json
-{ "action": "requestPinReset", "id_karyawan": "EMP002", "email": "siti@fsr.com" }
+Gejala: Klik **Tambah Karyawan / Edit / Nonaktifkan / Reset PIN** → toast merah:
+```
+Action tidak dikenali: "addUser"
+Action tidak dikenali: "updateUser"
+Action tidak dikenali: "setUserStatus"
+Action tidak dikenali: "resetPin"
 ```
 
-**Behavior:**
-- Validasi `id_karyawan` dan `email` cocok di sheet `Users`
-- Kalau cocok:
-  - Catat permintaan di sheet `PinResetRequests` (kolom: timestamp, id_karyawan, email, status)
-  - Kirim email ke admin (atau alamat email yang di-set di Script Properties `ADMIN_EMAIL`):
-    ```
-    Subject: Permintaan Reset PIN — {nama} ({id_karyawan})
-    Body: Karyawan {nama} ({id_karyawan}) meminta reset PIN.
-    Klik buka admin panel untuk memprosesnya.
-    ```
-- Kalau tidak cocok: balas `{ success:false, message:"ID atau email tidak cocok." }`
-
-**Response sukses:**
-```json
-{ "success": true, "message": "Permintaan dikirim. Admin akan memproses dalam 1x24 jam." }
-```
-
-> 💡 **Implementasi siap-paste:** Lihat `backend/Code.gs.example` di repo ini.
-
-### ⚠ Troubleshooting "Failed to fetch" pada Lupa PIN
-
-Gejala: User klik "Kirim Permintaan" → muncul "Gagal: Failed to fetch".
-
-Root cause yang paling sering: handler `requestPinReset` di GAS men-throw
-exception (biasanya karena `MailApp.sendEmail` belum di-authorize), GAS lalu
-membalas HTML error page, dan fetch frontend gagal mem-parse response sehingga
-melapor "Failed to fetch".
+Artinya: GAS Anda menerima request, tapi router `doGet/doPost` tidak punya
+case untuk action tersebut, sehingga balasan default "Action tidak dikenali"
+yang Anda kirim balik (atau equivalent) keluar.
 
 **Cara perbaiki:**
 
-1. Pastikan handler ada — paste fungsi `requestPinReset` dari `backend/Code.gs.example`.
-2. Authorize scope MailApp:
-   - Di editor Apps Script, klik dropdown fungsi → pilih `requestPinReset` → klik **Run**.
-   - Akan muncul dialog "Authorization required" → klik **Review permissions**.
-   - Login Google → klik **Advanced** → **Go to {project} (unsafe)** → **Allow**.
-   - Setelah diberi izin, fungsi akan exit dengan error karena dipanggil tanpa
-     payload — itu normal. Yang penting izin sudah di-grant.
-3. Set Script Property `ADMIN_EMAIL` ke email admin yang menerima notifikasi.
-4. Deploy ulang Web App: **Deploy → Manage Deployments → Edit → Version: New version → Deploy**.
-5. Pastikan deployment di-set "Execute as: Me" dan "Who has access: Anyone".
+1. Buka script Apps Script (Tools → Script editor di Sheets).
+2. Buka file `backend/Code.gs.example` di repo ini → copy seluruh isinya.
+3. Paste / merge ke `Code.gs` Anda. Pastikan:
+   - Fungsi `addUser`, `updateUser`, `setUserStatus`, `resetPin` ada.
+   - Router `routeAction_` (atau equivalent di backend Anda) meneruskan
+     keempat action tersebut ke handler yang sesuai.
+4. **Authorize Spreadsheet**: klik dropdown fungsi → pilih `addUser` → **Run**.
+   Dialog "Authorization required" → **Review permissions** → **Advanced** →
+   **Go to {project} (unsafe)** → **Allow**. Untuk `resetPin` ulangi dengan
+   memilih `resetPin` (perlu izin `MailApp` tambahan).
+5. **Deploy ulang Web App**: Deploy → Manage Deployments → Edit → Version:
+   **New version** → Deploy. Pastikan "Execute as: Me", "Who has access: Anyone".
 
-Frontend sekarang sudah tahan banting: kalau `requestPinReset` gagal,
-muncul modal "Permintaan Tidak Terkirim" dengan tombol **Email Admin** yang
-membuka aplikasi email pengguna dengan template siap kirim. Kalau Anda mengisi
-constant `ADMIN_CONTACT_EMAIL` di `index.html` (di sebelah `GAS_URL`), email
-otomatis ditujukan ke admin tersebut.
+Setelah langkah ini, semua action di tab Karyawan akan jalan.
 
 ---
 
-## 8. Action: `getAbsensiRange` (untuk Tab Absensi & export)
+## 8. Action: `getAbsensiRange` (untuk Tab Absensi)
 
 **Request:**
 ```json
@@ -328,14 +305,14 @@ Setelah deploy backend baru, cek di urutan ini:
 2. [ ] Login bisa input ID dengan huruf (mis. `EMP001`) — keyboard HP harus tampil alfanumerik
 3. [ ] Tab Overview di admin: KPI muncul, chart kebaca, leaderboard ada isi
 4. [ ] Tab Karyawan: search bekerja, tombol "Tambah Karyawan" buka modal (tidak ada field Departemen)
-5. [ ] Add karyawan baru → muncul di tabel (kolom Departemen tidak ada)
-6. [ ] Edit karyawan → field ke-update di sheet
+5. [ ] Add karyawan baru → muncul di tabel, kolom Jabatan & Tgl Masuk terisi
+6. [ ] Edit karyawan → semua field (termasuk Jabatan & Tgl Masuk) ter-load di modal
 7. [ ] Reset PIN → user terima email, PIN sheet ter-update
 8. [ ] Nonaktifkan karyawan → user tidak bisa login lagi
 9. [ ] Tab Absensi: filter tanggal range jalan, badge tampil "Masuk"/"Pulang"
-10. [ ] Export CSV download file (header tanpa kolom Departemen)
-11. [ ] Tombol "Laporan Bulan Ini" download CSV bulan berjalan
-12. [ ] Login: klik "Lupa PIN?" → modal muncul → submit kirim email ke admin
+10. [ ] Tab Absensi: keterangan telat ≥ 60 menit muncul format "X jam Y menit"
+11. [ ] Tab Absensi: badge lokasi tampil "Di Kantor" / "Diluar Kantor"
+12. [ ] Tab Pengajuan: muncul tabel dengan kolom Pengajuan, Nama, Jabatan, Mulai, Akhir, Lama, Alasan, Status, Aksi
 13. [ ] PWA: buka di Chrome mobile → muncul "Add to Home Screen"
 14. [ ] Halaman Karyawan di HP: tombol "Masuk" / "Pulang", status "JAM MASUK" / "JAM PULANG"
 15. [ ] Setelah install: jam 07:55 WIB notifikasi "Jangan lupa absen Masuk!" muncul
