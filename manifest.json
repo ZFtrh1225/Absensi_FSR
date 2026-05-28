@@ -1,0 +1,27 @@
+{
+  "name": "Absensi FSR",
+  "short_name": "Absensi FSR",
+  "description": "Sistem Manajemen Kehadiran Karyawan FSR",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "id",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "https://api.iconify.design/material-symbols:fingerprint.svg?color=%236366f1",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "https://api.iconify.design/material-symbols:fingerprint.svg?color=%236366f1",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
