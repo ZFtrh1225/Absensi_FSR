@@ -2566,11 +2566,15 @@
       // Hitung KPI + weekly chart + leaderboard dari endpoint yang umum tersedia.
       // Kalau backend punya `getAbsensiRange`, kita pakai data sebulan untuk
       // weekly chart & leaderboard. Kalau hanya `getTodayAbsensi`, jatuh balik
-      // ke data hari ini saja (weekly & leaderboard tetap terisi seadanya).
+      // ke data hari ini saja.
       //
-      // ⚠ Admin DI-EXCLUDE dari semua statistik (totalKaryawan, hadirHariIni,
-      // tidakHadir, weekly chart, leaderboard). Admin tetap bisa login &
-      // mengelola karyawan, tapi tidak dihitung sebagai karyawan.
+      // Strategi exclude Admin:
+      //   - totalKaryawan = jumlah user dengan role !== 'admin' && status !== 'inactive'
+      //   - Untuk record absensi: lookup ke SEMUA user (admin + karyawan).
+      //     Hanya record yang match user ber-role 'admin' atau status 'inactive'
+      //     yang di-exclude. Record yang tidak match user mana-mana (orphan,
+      //     mungkin format ID berbeda antar sheet) TETAP DIHITUNG supaya
+      //     leaderboard tidak hilang gara-gara data inconsistency.
       const today = todayWIB();
       const todayDate = new Date(today + 'T00:00:00+07:00');
       const monthStart =
@@ -2581,33 +2585,43 @@
         fetchAbsensiSafe(monthStart, today),
       ]);
 
-      // Filter: hanya karyawan aktif (exclude admin & inactive) untuk perhitungan stats.
       const allUsers = usersRes.users || [];
-      const karyawanUsers = allUsers.filter(u => {
+
+      // Total karyawan = exclude admin & inactive
+      const totalKaryawan = allUsers.filter(u => {
         const status = String(u.status || 'active').toLowerCase();
         const role   = String(u.role || 'Karyawan').toLowerCase();
         return status !== 'inactive' && role !== 'admin';
-      });
-      const totalKaryawan = karyawanUsers.length;
+      }).length;
 
-      // Lookup karyawan by ID — defensive trim/string cast supaya match berbagai
-      // format (number / string / dengan whitespace).
-      const karyawanByID = {};
-      karyawanUsers.forEach(u => {
+      // Lookup ALL users (termasuk admin) untuk identifikasi record.
+      // Trim + lowercase key supaya match defensif terhadap variasi format ID
+      // antar sheet (misal: "10155" vs "10155 " vs "P10155").
+      const allUserByID = {};
+      allUsers.forEach(u => {
         const key = String(u.id_karyawan || '').trim();
-        if (key) karyawanByID[key] = u;
+        if (key) allUserByID[key] = u;
       });
 
-      // Helper: cek apakah record absensi milik karyawan (bukan admin).
-      const isKaryawanRecord = (r) => !!karyawanByID[String(r.id_karyawan || '').trim()];
+      // Helper: record di-exclude HANYA kalau match dengan user admin/inactive.
+      // Orphan (lookup miss) tetap di-INCLUDE — anggap sebagai karyawan.
+      const isExcludedRecord = (r) => {
+        const u = allUserByID[String(r.id_karyawan || '').trim()];
+        if (!u) return false;
+        const role   = String(u.role   || '').toLowerCase();
+        const status = String(u.status || '').toLowerCase();
+        return role === 'admin' || status === 'inactive';
+      };
 
       const allRecords = monthRes.records || [];
 
-      // ── Stats hari ini (exclude admin) ──
+      // ── Stats hari ini ──
       const todayRecords = allRecords.filter(
         r => (r.timestamp || '').substring(0, 10) === today
       );
-      const todayCheckins = todayRecords.filter(r => r.tipe_absen === 'Check-In' && isKaryawanRecord(r));
+      const todayCheckins = todayRecords.filter(
+        r => r.tipe_absen === 'Check-In' && !isExcludedRecord(r)
+      );
       const hadirSet = new Set(todayCheckins.map(r => String(r.id_karyawan).trim()));
       const hadirHariIni = hadirSet.size;
 
@@ -2620,7 +2634,7 @@
 
       const tidakHadir = Math.max(0, totalKaryawan - hadirHariIni);
 
-      // ── Weekly chart (7 hari terakhir, exclude admin) ──
+      // ── Weekly chart (7 hari terakhir) ──
       const weekly = [];
       const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
       for (let i = 6; i >= 0; i--) {
@@ -2628,7 +2642,9 @@
         d.setDate(d.getDate() - i);
         const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         const dayRecs = allRecords.filter(r => (r.timestamp || '').substring(0, 10) === ds);
-        const dayCins = dayRecs.filter(r => r.tipe_absen === 'Check-In' && isKaryawanRecord(r));
+        const dayCins = dayRecs.filter(
+          r => r.tipe_absen === 'Check-In' && !isExcludedRecord(r)
+        );
         const daySet = new Set();
         let dayTelat = 0;
         dayCins.forEach(r => {
@@ -2652,18 +2668,19 @@
       // ── Leaderboard (top 5 tepat waktu bulan berjalan, exclude admin) ──
       const tepatCount = {};
       allRecords
-        .filter(r => r.tipe_absen === 'Check-In' && isKaryawanRecord(r))
+        .filter(r => r.tipe_absen === 'Check-In' && !isExcludedRecord(r))
         .forEach(r => {
           const t = (r.timestamp || '').substring(11, 19);
           const s = getAttendanceStatus(t, null);
           if (s && s.type === 'tepat') {
-            const key = String(r.id_karyawan).trim();
-            tepatCount[key] = (tepatCount[key] || 0) + 1;
+            const key = String(r.id_karyawan || '').trim();
+            if (key) tepatCount[key] = (tepatCount[key] || 0) + 1;
           }
         });
       const leaderboard = Object.entries(tepatCount)
         .map(([id, count]) => {
-          const u = karyawanByID[id] || {};
+          // Lookup nama+jabatan dari semua user. Kalau orphan, fallback id.
+          const u = allUserByID[id] || {};
           return {
             id_karyawan: id,
             nama: u.nama || id,
