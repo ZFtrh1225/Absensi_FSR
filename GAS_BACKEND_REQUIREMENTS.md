@@ -13,11 +13,13 @@ Tapi untuk fitur penuh, tambahkan action di bawah.
 
 Tambahkan kolom (kalau belum ada) di sheet `Users`:
 
-| id_karyawan | nama | pin | role | email | no_hp | departemen | jabatan | tanggal_masuk | status |
-|-------------|------|-----|------|-------|-------|------------|---------|---------------|--------|
+| id_karyawan | nama | pin | role | email | no_hp | jabatan | tanggal_masuk | status |
+|-------------|------|-----|------|-------|-------|---------|---------------|--------|
 
 - `status` valuenya: `active` atau `inactive` (default `active`)
 - `tanggal_masuk` format: `YYYY-MM-DD`
+- **Catatan:** kolom `departemen` SUDAH DIHAPUS dari kebutuhan. Kalau di sheet
+  Anda masih ada, tidak perlu dipakai (boleh di-hide atau di-drop).
 
 Login wajib mengecek `status !== 'inactive'`. User nonaktif tolak login dengan
 pesan: `"Akun Anda dinonaktifkan. Hubungi admin."`
@@ -37,7 +39,6 @@ Response sekarang harus include semua kolom baru:
       "role": "Karyawan",
       "email": "budi@fsr.com",
       "no_hp": "08123456789",
-      "departemen": "IT",
       "jabatan": "Staff",
       "tanggal_masuk": "2024-01-15",
       "status": "active"
@@ -58,7 +59,6 @@ Response sekarang harus include semua kolom baru:
   "nama": "Siti",
   "email": "siti@fsr.com",
   "no_hp": "0812...",
-  "departemen": "Finance",
   "jabatan": "Manager",
   "tanggal_masuk": "2026-05-28",
   "role": "Karyawan",
@@ -173,7 +173,6 @@ Response sekarang harus include semua kolom baru:
       "timestamp": "2026-05-28 08:13:42",
       "id_karyawan": "EMP001",
       "nama": "Budi",
-      "departemen": "IT",
       "tipe_absen": "Check-In",
       "latitude": -5.395,
       "longitude": 105.220,
@@ -184,9 +183,9 @@ Response sekarang harus include semua kolom baru:
   ]
 }
 ```
-> Tambahkan field `departemen` di setiap record kalau bisa (lookup dari sheet Users
-> saat write atau saat read). Frontend juga punya fallback dari user list, tapi
-> server-side lebih akurat.
+> Field `tipe_absen` tetap `"Check-In"` / `"Check-Out"` di backend (jangan
+> diubah supaya kompatibel dengan data lama). Frontend yang menampilkan label
+> "Masuk" / "Pulang" ke user.
 
 ---
 
@@ -216,11 +215,11 @@ Response sekarang harus include semua kolom baru:
       { "date": "2026-05-28", "label": "Kam", "hadir": 33, "telat": 5, "alpa": 4 }
     ],
     "leaderboard": [
-      { "id_karyawan": "EMP010", "nama": "Andi",  "departemen": "IT",      "tepat_waktu": 22 },
-      { "id_karyawan": "EMP005", "nama": "Rina",  "departemen": "HRD",     "tepat_waktu": 21 },
-      { "id_karyawan": "EMP012", "nama": "Joko",  "departemen": "Finance", "tepat_waktu": 20 },
-      { "id_karyawan": "EMP003", "nama": "Wati",  "departemen": "IT",      "tepat_waktu": 19 },
-      { "id_karyawan": "EMP008", "nama": "Doni",  "departemen": "Ops",     "tepat_waktu": 18 }
+      { "id_karyawan": "EMP010", "nama": "Andi",  "jabatan": "Manager", "tepat_waktu": 22 },
+      { "id_karyawan": "EMP005", "nama": "Rina",  "jabatan": "Staff",   "tepat_waktu": 21 },
+      { "id_karyawan": "EMP012", "nama": "Joko",  "jabatan": "Staff",   "tepat_waktu": 20 },
+      { "id_karyawan": "EMP003", "nama": "Wati",  "jabatan": "Manager", "tepat_waktu": 19 },
+      { "id_karyawan": "EMP008", "nama": "Doni",  "jabatan": "Staff",   "tepat_waktu": 18 }
     ]
   }
 }
@@ -264,12 +263,12 @@ Setelah deploy backend baru, cek di urutan ini:
 
 1. [ ] Login user lama masih jalan
 2. [ ] Tab Overview di admin: KPI muncul, chart kebaca, leaderboard ada isi
-3. [ ] Tab Karyawan: search bekerja, filter departemen muncul, tombol "Tambah Karyawan" buka modal
+3. [ ] Tab Karyawan: search bekerja, tombol "Tambah Karyawan" buka modal, filter Status (Aktif/Nonaktif) jalan
 4. [ ] Add karyawan baru → muncul di tabel
 5. [ ] Edit karyawan → field ke-update di sheet
 6. [ ] Reset PIN → user terima email, PIN sheet ter-update
 7. [ ] Nonaktifkan karyawan → user tidak bisa login lagi
-8. [ ] Tab Absensi: filter tanggal range jalan, export CSV download file
+8. [ ] Tab Absensi: filter tanggal range jalan, export CSV download file (tanpa kolom Departemen)
 9. [ ] Tombol "Laporan Bulan Ini" download CSV bulan berjalan
 10. [ ] Login: klik "Lupa PIN?" → modal muncul → submit kirim email ke admin
 11. [ ] PWA: buka di Chrome mobile → muncul "Add to Home Screen"
