@@ -550,7 +550,7 @@
     <p style="color:rgba(255,255,255,0.5);font-size:0.82rem;margin:0;">Pastikan wajah terlihat jelas</p>
     <video id="selfie-video" autoplay playsinline muted></video>
     <img id="selfie-preview" class="hidden" />
-    <canvas id="selfie-canvas" width="480" height="480"></canvas>
+    <canvas id="selfie-canvas" width="320" height="320"></canvas>
     <div id="selfie-actions" style="display:flex;gap:0.75rem;">
       <button onclick="captureSelfie()" id="selfie-capture-btn" class="btn btn-primary" style="padding:0.7rem 1.5rem;">
         <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -1036,9 +1036,31 @@
 
     /* ──────────────────────────────────────────────
        API LAYER
+       - Small payloads (≤ 2KB JSON) : GET ?data=<JSON>
+       - Large payloads (e.g. selfie): POST text/plain (no preflight)
+       Both go to handleRequest() in GAS.
     ────────────────────────────────────────────── */
     async function apiCall(payload) {
-      const encoded  = encodeURIComponent(JSON.stringify(payload));
+      const body = JSON.stringify(payload);
+
+      // Use POST for large payloads (selfie ~30-80KB exceeds URL limit)
+      if (body.length > 2000) {
+        const response = await fetch(GAS_URL, {
+          method   : 'POST',
+          redirect : 'follow',
+          cache    : 'no-cache',
+          // text/plain avoids CORS preflight; GAS reads e.postData.contents anyway
+          headers  : { 'Content-Type': 'text/plain;charset=utf-8' },
+          body     : body,
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const text = await response.text();
+        try { return JSON.parse(text); }
+        catch (e) { throw new Error('Server mengembalikan response tidak valid.'); }
+      }
+
+      // Small payloads: GET (existing flow, fastest)
+      const encoded  = encodeURIComponent(body);
       const url      = `${GAS_URL}?data=${encoded}`;
       const response = await fetch(url, { method: 'GET', redirect: 'follow', cache: 'no-cache' });
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -1284,8 +1306,11 @@
       const video  = document.getElementById('selfie-video');
       const canvas = document.getElementById('selfie-canvas');
       const ctx    = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, 480, 480);
-      selfieDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      // Compressed: 320x320 @ 55% quality keeps payload ~15-25 KB (safe for GAS POST)
+      canvas.width  = 320;
+      canvas.height = 320;
+      ctx.drawImage(video, 0, 0, 320, 320);
+      selfieDataUrl = canvas.toDataURL('image/jpeg', 0.55);
 
       // Show preview
       const preview = document.getElementById('selfie-preview');
