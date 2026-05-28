@@ -10,22 +10,18 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
-            sans  : ['Sora', 'sans-serif'],
-            mono  : ['"JetBrains Mono"', 'monospace'],
+            sans: ['Sora', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
           },
           colors: {
             brand: {
-              50 : '#eef2ff',
-              100: '#e0e7ff',
-              400: '#818cf8',
-              500: '#6366f1',
-              600: '#4f46e5',
-              700: '#4338ca',
-              800: '#3730a3',
-              900: '#1e1b4b',
+              50: '#eef2ff', 100: '#e0e7ff', 400: '#818cf8',
+              500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
+              800: '#3730a3', 900: '#1e1b4b',
             }
           }
         }
@@ -38,15 +34,53 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
+
   <style>
-    /* ── Base ─────────────────────────────────────── */
+    /* ── Base & Dark Mode Variables ────────────────── */
+    :root {
+      --bg-primary: #f1f5f9;
+      --bg-card: #ffffff;
+      --bg-card-hover: #f8fafc;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --border-light: #e2e8f0;
+      --border-lighter: #f1f5f9;
+      --header-bg: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+      --tab-bg: #ffffff;
+      --field-bg: #f8fafc;
+      --field-border: #e2e8f0;
+      --field-text: #0f172a;
+    }
+    .dark {
+      --bg-primary: #0f172a;
+      --bg-card: #1e293b;
+      --bg-card-hover: #334155;
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --text-muted: #64748b;
+      --border-light: #334155;
+      --border-lighter: #1e293b;
+      --header-bg: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+      --tab-bg: #1e293b;
+      --field-bg: #1e293b;
+      --field-border: #334155;
+      --field-text: #f1f5f9;
+    }
+
     *, *::before, *::after { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
-    body { font-family: 'Sora', sans-serif; background: #f1f5f9; }
+    body {
+      font-family: 'Sora', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      transition: background 0.3s, color 0.3s;
+    }
 
     /* ── View switching ───────────────────────────── */
     .view { display: none; }
     .view.active { display: flex; }
+
 
     /* ── Login background ─────────────────────────── */
     #view-login {
@@ -60,8 +94,6 @@
       justify-content: center;
       padding: 1.5rem;
     }
-
-    /* subtle grid overlay on login */
     #view-login::before {
       content: '';
       position: fixed; inset: 0;
@@ -72,7 +104,7 @@
       pointer-events: none;
     }
 
-    /* ── Glass card (login) ───────────────────────── */
+    /* ── Glass card ───────────────────────────────── */
     .glass-card {
       background: rgba(255,255,255,0.04);
       border: 1px solid rgba(255,255,255,0.1);
@@ -87,11 +119,13 @@
       font-weight: 700;
       letter-spacing: -0.02em;
       line-height: 1;
+      color: var(--text-primary);
     }
 
-    /* ── PIN input: hide native password reveal (IE/Edge) ── */
+    /* ── PIN input ── */
     input[type="password"]::-ms-reveal,
     input[type="password"]::-ms-clear { display: none; }
+
 
     /* ── Animations ───────────────────────────────── */
     @keyframes fadeSlideUp {
@@ -99,8 +133,7 @@
       to   { opacity: 1; transform: translateY(0); }
     }
     @keyframes fadeIn {
-      from { opacity: 0; }
-      to   { opacity: 1; }
+      from { opacity: 0; } to { opacity: 1; }
     }
     @keyframes pulse-ring {
       0%   { transform: scale(0.9); opacity: 1; }
@@ -108,21 +141,48 @@
     }
     @keyframes toastIn {
       from { opacity: 0; transform: translateY(8px) scale(0.97); }
-      to   { opacity: 1; transform: translateY(0)  scale(1); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
     }
     @keyframes toastOut {
-      from { opacity: 1; transform: translateY(0)  scale(1); }
+      from { opacity: 1; transform: translateY(0) scale(1); }
       to   { opacity: 0; transform: translateY(8px) scale(0.97); }
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: scale(0.92) translateY(10px); }
+      to   { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    @keyframes modalOut {
+      from { opacity: 1; transform: scale(1) translateY(0); }
+      to   { opacity: 0; transform: scale(0.92) translateY(10px); }
+    }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
     }
 
     .anim-slide { animation: fadeSlideUp 0.4s ease both; }
     .anim-fade  { animation: fadeIn 0.3s ease both; }
-
     .anim-slide:nth-child(1) { animation-delay: 0.05s; }
     .anim-slide:nth-child(2) { animation-delay: 0.10s; }
     .anim-slide:nth-child(3) { animation-delay: 0.15s; }
     .anim-slide:nth-child(4) { animation-delay: 0.20s; }
     .anim-slide:nth-child(5) { animation-delay: 0.25s; }
+
+
+    /* ── Skeleton Loader ──────────────────────────── */
+    .skeleton {
+      background: linear-gradient(90deg, var(--border-lighter) 25%, var(--border-light) 50%, var(--border-lighter) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s ease-in-out infinite;
+      border-radius: 6px;
+    }
+    .skeleton-row {
+      display: flex; gap: 1rem; padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border-lighter);
+    }
+    .skeleton-cell {
+      height: 14px; border-radius: 6px; flex: 1;
+    }
 
     /* ── GPS overlay ──────────────────────────────── */
     #gps-overlay {
@@ -140,6 +200,30 @@
       background: rgba(99,102,241,0.35);
       animation: pulse-ring 1.4s ease-out infinite;
     }
+
+    /* ── Modal Overlay ────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(15,23,42,0.6);
+      backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 1.5rem;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: all; }
+    .modal-box {
+      background: var(--bg-card);
+      border-radius: 20px;
+      padding: 2rem;
+      max-width: 400px; width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: modalIn 0.3s ease both;
+    }
+    .modal-overlay:not(.active) .modal-box {
+      animation: modalOut 0.2s ease both;
+    }
+
 
     /* ── Toast container ──────────────────────────── */
     #toast-container {
@@ -187,14 +271,16 @@
       box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
     }
     .field-light {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      color: #0f172a;
+      background: var(--field-bg);
+      border: 1px solid var(--field-border);
+      color: var(--field-text);
     }
+    .field-light::placeholder { color: var(--text-muted); }
     .field-light:focus {
       border-color: #6366f1;
       box-shadow: 0 0 0 3px rgba(99,102,241,0.12);
     }
+
 
     /* ── Buttons ──────────────────────────────────── */
     .btn {
@@ -238,41 +324,55 @@
       padding: 0.45rem 0.9rem;
     }
     .btn-ghost:hover { background: rgba(255,255,255,0.08); color: white; }
+    .btn-outline {
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-light);
+      padding: 0.6rem 1.2rem;
+    }
+    .btn-outline:hover { background: var(--bg-card-hover); }
+    .btn-danger {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      color: white; padding: 0.7rem 1.4rem;
+      box-shadow: 0 4px 14px rgba(239,68,68,0.3);
+    }
+    .btn-success {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white; padding: 0.7rem 1.4rem;
+      box-shadow: 0 4px 14px rgba(16,185,129,0.3);
+    }
 
-    /* ── Admin tabs ───────────────────────────────── */
+
+    /* ── Tabs ─────────────────────────────────────── */
     .tab-btn {
       padding: 0.6rem 1.25rem;
       border-radius: 8px;
-      font-weight: 500; font-size: 0.9rem;
+      font-weight: 500; font-size: 0.85rem;
       cursor: pointer; border: none;
       transition: background 0.2s, color 0.2s;
+      white-space: nowrap;
     }
-    .tab-btn.active {
-      background: #6366f1; color: white;
-    }
-    .tab-btn:not(.active) {
-      background: transparent; color: #64748b;
-    }
-    .tab-btn:not(.active):hover { background: #f1f5f9; color: #334155; }
+    .tab-btn.active { background: #6366f1; color: white; }
+    .tab-btn:not(.active) { background: transparent; color: var(--text-muted); }
+    .tab-btn:not(.active):hover { background: var(--bg-card-hover); color: var(--text-secondary); }
 
     /* ── Table ────────────────────────────────────── */
     .data-table { width: 100%; border-collapse: collapse; }
     .data-table th {
-      text-align: left;
-      padding: 0.6rem 1rem;
+      text-align: left; padding: 0.6rem 1rem;
       font-size: 0.7rem; font-weight: 600;
       text-transform: uppercase; letter-spacing: 0.08em;
-      color: #94a3b8;
-      border-bottom: 1px solid #e2e8f0;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-light);
     }
     .data-table td {
       padding: 0.75rem 1rem;
       font-size: 0.875rem;
-      border-bottom: 1px solid #f1f5f9;
-      color: #334155;
+      border-bottom: 1px solid var(--border-lighter);
+      color: var(--text-secondary);
     }
     .data-table tr:last-child td { border-bottom: none; }
-    .data-table tbody tr:hover td { background: #f8fafc; }
+    .data-table tbody tr:hover td { background: var(--bg-card-hover); }
 
     /* ── Badge ────────────────────────────────────── */
     .badge {
@@ -284,12 +384,19 @@
     .badge-karyawan { background: #f0fdf4; color: #166534; }
     .badge-checkin  { background: #dcfce7; color: #15803d; }
     .badge-checkout { background: #fee2e2; color: #b91c1c; }
+    .badge-telat    { background: #fef3c7; color: #92400e; }
+    .badge-tepat    { background: #dcfce7; color: #166534; }
+    .badge-lembur   { background: #e0e7ff; color: #3730a3; }
+    .badge-pending  { background: #fef3c7; color: #92400e; }
+    .badge-approved { background: #dcfce7; color: #166534; }
+    .badge-rejected { background: #fee2e2; color: #b91c1c; }
 
     /* ── Card ─────────────────────────────────────── */
     .card {
-      background: white;
+      background: var(--bg-card);
       border-radius: 16px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.05);
+      transition: background 0.3s;
     }
 
     /* ── Spinner ──────────────────────────────────── */
@@ -302,19 +409,116 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Scrollbar (admin table) ──────────────────── */
+    /* ── Scrollbar ────────────────────────────────── */
     .scroll-x { overflow-x: auto; }
     .scroll-x::-webkit-scrollbar { height: 6px; }
     .scroll-x::-webkit-scrollbar-track { background: transparent; }
     .scroll-x::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 
-    /* ── Karyawan status dots ─────────────────────── */
-    .status-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%; display: inline-block;
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+
+    /* ── Selfie Camera ────────────────────────────── */
+    #selfie-overlay {
+      position: fixed; inset: 0; z-index: 150;
+      background: rgba(15,23,42,0.85);
+      backdrop-filter: blur(8px);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 1rem; padding: 1.5rem;
     }
+    #selfie-overlay.hidden { display: none; }
+    #selfie-video {
+      width: 240px; height: 240px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 4px solid #6366f1;
+      box-shadow: 0 0 40px rgba(99,102,241,0.4);
+    }
+    #selfie-canvas { display: none; }
+    #selfie-preview {
+      width: 240px; height: 240px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 4px solid #10b981;
+      box-shadow: 0 0 40px rgba(16,185,129,0.4);
+    }
+    #selfie-preview.hidden { display: none; }
+
+    /* ── Karyawan Bottom Nav ──────────────────────── */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border-light);
+      display: flex; justify-content: space-around;
+      padding: 0.5rem 0 calc(0.5rem + env(safe-area-inset-bottom));
+      z-index: 50;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+    }
+    .nav-item {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.2rem; padding: 0.4rem 0.8rem;
+      border-radius: 10px; cursor: pointer;
+      color: var(--text-muted); font-size: 0.65rem; font-weight: 500;
+      transition: color 0.2s, background 0.2s;
+      border: none; background: none;
+    }
+    .nav-item.active { color: #6366f1; background: rgba(99,102,241,0.08); }
+    .nav-item:hover { color: #6366f1; }
+
+    /* ── Calendar ─────────────────────────────────── */
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .cal-day {
+      aspect-ratio: 1;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 8px; font-size: 0.75rem; font-weight: 500;
+      cursor: default; position: relative;
+    }
+    .cal-day.hadir { background: #dcfce7; color: #166534; }
+    .cal-day.telat { background: #fef3c7; color: #92400e; }
+    .cal-day.alpa  { background: #fee2e2; color: #b91c1c; }
+    .cal-day.izin  { background: #e0e7ff; color: #3730a3; }
+    .cal-day.today { border: 2px solid #6366f1; font-weight: 700; }
+    .cal-day.empty { background: transparent; }
+
+    /* ── Dark Mode Toggle ─────────────────────────── */
+    .dark-toggle {
+      width: 44px; height: 24px;
+      border-radius: 12px;
+      background: #e2e8f0;
+      position: relative;
+      cursor: pointer;
+      border: none;
+      transition: background 0.3s;
+    }
+    .dark .dark-toggle { background: #4f46e5; }
+    .dark-toggle::after {
+      content: '';
+      position: absolute;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: white;
+      top: 3px; left: 3px;
+      transition: transform 0.3s;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .dark .dark-toggle::after { transform: translateX(20px); }
+
+    /* ── Geofence Status ──────────────────────────── */
+    .geofence-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 0.3rem 0.7rem; border-radius: 999px;
+      font-size: 0.72rem; font-weight: 600;
+    }
+    .geofence-in { background: #dcfce7; color: #166534; }
+    .geofence-out { background: #fef3c7; color: #92400e; }
   </style>
 </head>
+
 
 <body>
 
@@ -325,7 +529,6 @@
     <div style="position:relative;">
       <div class="pulse-ring" style="position:absolute;inset:0;margin:auto;width:72px;height:72px;"></div>
       <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#4f46e5);display:flex;align-items:center;justify-content:center;position:relative;z-index:1;">
-        <!-- GPS icon -->
         <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="1.8">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 2C8.134 2 5 5.134 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.866-3.134-7-7-7z"/>
           <circle cx="12" cy="9" r="2.5" fill="white" stroke="none"/>
@@ -336,23 +539,58 @@
     <p style="color:rgba(255,255,255,0.5);font-size:0.85rem;margin:0;text-align:center;max-width:220px;">
       Izinkan akses lokasi pada browser Anda
     </p>
+    <button onclick="cancelGPS()" class="btn btn-outline" style="color:white;border-color:rgba(255,255,255,0.3);margin-top:0.5rem;">Batalkan</button>
   </div>
 
   <!-- ═══════════════════════════════════════════════
-       TOAST CONTAINER
+       SELFIE CAMERA OVERLAY
   ═══════════════════════════════════════════════ -->
+  <div id="selfie-overlay" class="hidden">
+    <p style="color:white;font-weight:600;font-size:1.1rem;margin:0;">Ambil Foto Selfie</p>
+    <p style="color:rgba(255,255,255,0.5);font-size:0.82rem;margin:0;">Pastikan wajah terlihat jelas</p>
+    <video id="selfie-video" autoplay playsinline muted></video>
+    <img id="selfie-preview" class="hidden" />
+    <canvas id="selfie-canvas" width="480" height="480"></canvas>
+    <div id="selfie-actions" style="display:flex;gap:0.75rem;">
+      <button onclick="captureSelfie()" id="selfie-capture-btn" class="btn btn-primary" style="padding:0.7rem 1.5rem;">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+          <circle cx="12" cy="13" r="3"/>
+        </svg>
+        Ambil Foto
+      </button>
+      <button onclick="cancelSelfie()" class="btn btn-outline" style="color:white;border-color:rgba(255,255,255,0.3);">Batal</button>
+    </div>
+    <div id="selfie-confirm-actions" style="display:none;gap:0.75rem;">
+      <button onclick="confirmSelfie()" class="btn btn-success" style="padding:0.7rem 1.5rem;">✓ Gunakan Foto</button>
+      <button onclick="retakeSelfie()" class="btn btn-outline" style="color:white;border-color:rgba(255,255,255,0.3);">Ulangi</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       CUSTOM MODAL
+  ═══════════════════════════════════════════════ -->
+  <div id="custom-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div id="modal-icon" style="text-align:center;margin-bottom:1rem;"></div>
+      <h3 id="modal-title" style="font-size:1.1rem;font-weight:700;text-align:center;margin:0 0 0.5rem;color:var(--text-primary);"></h3>
+      <p id="modal-message" style="font-size:0.875rem;text-align:center;color:var(--text-secondary);margin:0 0 1.5rem;line-height:1.5;"></p>
+      <div id="modal-actions" style="display:flex;gap:0.75rem;justify-content:center;"></div>
+    </div>
+  </div>
+
+  <!-- TOAST CONTAINER -->
   <div id="toast-container"></div>
+
 
   <!-- ═══════════════════════════════════════════════
        VIEW 1: LOGIN
   ═══════════════════════════════════════════════ -->
   <div id="view-login" class="view">
     <div style="position:relative;z-index:1;width:100%;max-width:420px;">
-
       <!-- Logo -->
       <div class="anim-slide" style="text-align:center;margin-bottom:2rem;">
         <div style="display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,#6366f1,#4f46e5);margin-bottom:1rem;box-shadow:0 8px 24px rgba(99,102,241,0.4);">
-          <!-- Fingerprint icon -->
           <svg width="34" height="34" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="1.6">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839-1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/>
           </svg>
@@ -367,37 +605,24 @@
 
         <!-- ID Karyawan -->
         <div class="anim-slide" style="margin-bottom:1rem;">
-          <label style="display:block;color:rgba(255,255,255,0.6);font-size:0.8rem;font-weight:500;margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">
-            ID Karyawan
-          </label>
+          <label style="display:block;color:rgba(255,255,255,0.6);font-size:0.8rem;font-weight:500;margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">ID Karyawan</label>
           <div style="position:relative;">
             <span style="position:absolute;left:0.9rem;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.35);">
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/>
-              </svg>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0"/></svg>
             </span>
-            <input id="login-id" type="text" inputmode="numeric" placeholder="Masukkan ID karyawan"
-              class="field field-dark" style="padding-left:2.6rem;"
-              autocomplete="username" />
+            <input id="login-id" type="text" inputmode="numeric" placeholder="Masukkan ID karyawan" class="field field-dark" style="padding-left:2.6rem;" autocomplete="username" />
           </div>
         </div>
 
         <!-- PIN -->
         <div class="anim-slide" style="margin-bottom:1.5rem;">
-          <label style="display:block;color:rgba(255,255,255,0.6);font-size:0.8rem;font-weight:500;margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">
-            PIN
-          </label>
+          <label style="display:block;color:rgba(255,255,255,0.6);font-size:0.8rem;font-weight:500;margin-bottom:0.4rem;letter-spacing:0.04em;text-transform:uppercase;">PIN</label>
           <div style="position:relative;">
             <span style="position:absolute;left:0.9rem;top:50%;transform:translateY(-50%);color:rgba(255,255,255,0.35);">
-              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-              </svg>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
             </span>
-            <input id="login-pin" type="password" inputmode="numeric" placeholder="Masukkan PIN"
-              class="field field-dark" style="padding-left:2.6rem;padding-right:2.8rem;"
-              autocomplete="current-password" />
-            <button id="toggle-pin" onclick="togglePinVisibility()"
-              style="position:absolute;right:0.9rem;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,0.35);cursor:pointer;padding:0;display:flex;align-items:center;">
+            <input id="login-pin" type="password" inputmode="numeric" placeholder="Masukkan PIN" class="field field-dark" style="padding-left:2.6rem;padding-right:2.8rem;" autocomplete="current-password" />
+            <button onclick="togglePinVisibility()" style="position:absolute;right:0.9rem;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,0.35);cursor:pointer;padding:0;display:flex;">
               <svg id="pin-eye-icon" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -406,11 +631,9 @@
           </div>
         </div>
 
-        <!-- Error message -->
-        <div id="login-error" style="display:none;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:0.65rem 0.9rem;margin-bottom:1rem;color:#fca5a5;font-size:0.85rem;display:flex;align-items:center;gap:0.5rem;">
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="flex-shrink:0;">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
+        <!-- Error -->
+        <div id="login-error" style="display:none;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:0.65rem 0.9rem;margin-bottom:1rem;color:#fca5a5;font-size:0.85rem;align-items:center;gap:0.5rem;">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
           <span id="login-error-text"></span>
         </div>
 
@@ -421,172 +644,259 @@
       </div>
 
       <p class="anim-slide" style="text-align:center;color:rgba(255,255,255,0.2);font-size:0.78rem;margin-top:1.5rem;">
-        &copy; 2024 Absensi FSR · Powered by Google Apps Script
+        &copy; 2025 Absensi FSR · v2.0 Pro
       </p>
     </div>
   </div>
 
+
   <!-- ═══════════════════════════════════════════════
        VIEW 2: KARYAWAN DASHBOARD
   ═══════════════════════════════════════════════ -->
-  <div id="view-karyawan" class="view" style="flex-direction:column;min-height:100vh;background:#f1f5f9;">
+  <div id="view-karyawan" class="view" style="flex-direction:column;min-height:100vh;background:var(--bg-primary);">
 
     <!-- Top bar -->
-    <header style="background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);padding:0.9rem 1.25rem;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(0,0,0,0.2);">
+    <header style="background:var(--header-bg);padding:0.9rem 1.25rem;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(0,0,0,0.2);">
       <div style="display:flex;align-items:center;gap:0.75rem;">
         <div style="width:36px;height:36px;border-radius:10px;background:rgba(99,102,241,0.4);display:flex;align-items:center;justify-content:center;">
-          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="1.8">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-          </svg>
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
         </div>
         <div>
           <p id="karyawan-nama" style="color:white;font-weight:600;font-size:0.9rem;margin:0;line-height:1.2;"></p>
           <p id="karyawan-id" style="color:rgba(255,255,255,0.45);font-size:0.72rem;margin:0;"></p>
         </div>
       </div>
-      <button onclick="handleLogout()" class="btn btn-ghost" style="font-size:0.8rem;">
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-        </svg>
-        Keluar
-      </button>
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <button class="dark-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode"></button>
+        <button onclick="handleLogout()" class="btn btn-ghost" style="font-size:0.8rem;">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          Keluar
+        </button>
+      </div>
     </header>
 
-    <!-- Main content -->
-    <main style="flex:1;display:flex;flex-direction:column;align-items:center;padding:1.5rem;gap:1.25rem;max-width:480px;margin:0 auto;width:100%;">
+    <!-- Karyawan Tab Content -->
+    <main id="karyawan-content" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:1.5rem 1.5rem 5rem;gap:1.25rem;max-width:520px;margin:0 auto;width:100%;">
+      <!-- Tab: Absen (default) -->
+      <div id="karyawan-tab-absen" style="width:100%;display:flex;flex-direction:column;gap:1.25rem;">
+        <!-- Clock card -->
+        <div class="card anim-slide" style="width:100%;padding:1.75rem;text-align:center;">
+          <div id="clock"></div>
+          <p id="clock-date" style="color:var(--text-muted);font-size:0.875rem;margin:0.4rem 0 0;font-weight:500;"></p>
+        </div>
 
-      <!-- Clock card -->
-      <div class="card anim-slide" style="width:100%;padding:1.75rem;text-align:center;">
-        <div id="clock" style="color:#0f172a;"></div>
-        <p id="clock-date" style="color:#64748b;font-size:0.875rem;margin:0.4rem 0 0;font-weight:500;"></p>
+        <!-- Geofence Status -->
+        <div class="card anim-slide" style="width:100%;padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="color:var(--text-muted);"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/></svg>
+            <span style="font-size:0.8rem;color:var(--text-secondary);">Status Lokasi</span>
+          </div>
+          <span id="geofence-status" class="geofence-badge geofence-out">Belum terdeteksi</span>
+        </div>
+
+        <!-- Status card -->
+        <div class="card anim-slide" style="width:100%;padding:1.25rem 1.5rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
+            <p style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin:0;">Status Hari Ini</p>
+            <span id="attendance-badge" class="badge" style="display:none;"></span>
+          </div>
+          <div style="display:flex;gap:1rem;">
+            <div style="flex:1;padding:0.75rem;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
+                <span class="status-dot" style="background:#10b981;"></span>
+                <span style="font-size:0.75rem;font-weight:600;color:#15803d;text-transform:uppercase;letter-spacing:0.04em;">Check-In</span>
+              </div>
+              <p id="status-checkin" style="font-size:0.9rem;font-weight:600;color:#166534;margin:0;font-family:'JetBrains Mono',monospace;">—</p>
+            </div>
+            <div style="flex:1;padding:0.75rem;background:#fff1f2;border-radius:10px;border:1px solid #fecdd3;">
+              <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
+                <span class="status-dot" style="background:#ef4444;"></span>
+                <span style="font-size:0.75rem;font-weight:600;color:#b91c1c;text-transform:uppercase;letter-spacing:0.04em;">Check-Out</span>
+              </div>
+              <p id="status-checkout" style="font-size:0.9rem;font-weight:600;color:#991b1b;margin:0;font-family:'JetBrains Mono',monospace;">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="anim-slide" style="display:flex;flex-direction:column;gap:0.875rem;width:100%;">
+          <button id="btn-checkin" onclick="startAbsensiFlow('Check-In')" class="btn btn-checkin" style="width:100%;border-radius:14px;">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>
+            Check-In
+          </button>
+          <button id="btn-checkout" onclick="startAbsensiFlow('Check-Out')" class="btn btn-checkout" style="width:100%;border-radius:14px;">
+            <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+            Check-Out
+          </button>
+        </div>
+
+        <p class="anim-slide" style="color:var(--text-muted);font-size:0.78rem;text-align:center;margin:0;display:flex;align-items:center;gap:0.4rem;justify-content:center;">
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><circle cx="12" cy="13" r="3"/></svg>
+          Selfie + GPS otomatis diambil saat absen
+        </p>
       </div>
 
-      <!-- Status card -->
-      <div class="card anim-slide" style="width:100%;padding:1.25rem 1.5rem;">
-        <p style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:#94a3b8;margin:0 0 0.75rem;">Status Hari Ini</p>
-        <div style="display:flex;gap:1rem;">
-          <div style="flex:1;padding:0.75rem;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
-            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
-              <span class="status-dot" style="background:#10b981;"></span>
-              <span style="font-size:0.75rem;font-weight:600;color:#15803d;text-transform:uppercase;letter-spacing:0.04em;">Check-In</span>
+
+      <!-- Tab: Riwayat -->
+      <div id="karyawan-tab-riwayat" style="width:100%;display:none;flex-direction:column;gap:1.25rem;">
+        <div class="card anim-slide" style="width:100%;padding:1.5rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+            <h3 style="font-size:1rem;font-weight:700;color:var(--text-primary);margin:0;">Riwayat Kehadiran</h3>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <button onclick="changeMonth(-1)" class="btn btn-sm btn-outline" style="padding:0.3rem 0.5rem;">←</button>
+              <span id="riwayat-month" style="font-size:0.82rem;font-weight:600;color:var(--text-secondary);min-width:100px;text-align:center;"></span>
+              <button onclick="changeMonth(1)" class="btn btn-sm btn-outline" style="padding:0.3rem 0.5rem;">→</button>
             </div>
-            <p id="status-checkin" style="font-size:0.9rem;font-weight:600;color:#166534;margin:0;font-family:'JetBrains Mono',monospace;">—</p>
           </div>
-          <div style="flex:1;padding:0.75rem;background:#fff1f2;border-radius:10px;border:1px solid #fecdd3;">
-            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
-              <span class="status-dot" style="background:#ef4444;"></span>
-              <span style="font-size:0.75rem;font-weight:600;color:#b91c1c;text-transform:uppercase;letter-spacing:0.04em;">Check-Out</span>
-            </div>
-            <p id="status-checkout" style="font-size:0.9rem;font-weight:600;color:#991b1b;margin:0;font-family:'JetBrains Mono',monospace;">—</p>
+          <!-- Summary -->
+          <div id="riwayat-summary" style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;"></div>
+          <!-- Calendar Header -->
+          <div class="calendar-grid" style="margin-bottom:0.25rem;">
+            <div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--text-muted);padding:0.3rem;">Min</div>
+            <div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--text-muted);padding:0.3rem;">Sen</div>
+            <div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--text-muted);padding:0.3rem;">Sel</div>
+            <div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--text-muted);padding:0.3rem;">Rab</div>
+            <div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--text-muted);padding:0.3rem;">Kam</div>
+            <div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--text-muted);padding:0.3rem;">Jum</div>
+            <div style="text-align:center;font-size:0.65rem;font-weight:600;color:var(--text-muted);padding:0.3rem;">Sab</div>
+          </div>
+          <!-- Calendar Days -->
+          <div id="riwayat-calendar" class="calendar-grid"></div>
+          <!-- Legend -->
+          <div style="display:flex;gap:1rem;margin-top:1rem;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:0.3rem;"><div style="width:12px;height:12px;border-radius:3px;background:#dcfce7;"></div><span style="font-size:0.68rem;color:var(--text-muted);">Hadir</span></div>
+            <div style="display:flex;align-items:center;gap:0.3rem;"><div style="width:12px;height:12px;border-radius:3px;background:#fef3c7;"></div><span style="font-size:0.68rem;color:var(--text-muted);">Telat</span></div>
+            <div style="display:flex;align-items:center;gap:0.3rem;"><div style="width:12px;height:12px;border-radius:3px;background:#fee2e2;"></div><span style="font-size:0.68rem;color:var(--text-muted);">Alpa</span></div>
+            <div style="display:flex;align-items:center;gap:0.3rem;"><div style="width:12px;height:12px;border-radius:3px;background:#e0e7ff;"></div><span style="font-size:0.68rem;color:var(--text-muted);">Izin/Cuti</span></div>
           </div>
         </div>
       </div>
 
-      <!-- Action buttons -->
-      <div class="anim-slide" style="display:flex;flex-direction:column;gap:0.875rem;width:100%;">
+      <!-- Tab: Izin/Cuti -->
+      <div id="karyawan-tab-izin" style="width:100%;display:none;flex-direction:column;gap:1.25rem;">
+        <div class="card anim-slide" style="width:100%;padding:1.5rem;">
+          <h3 style="font-size:1rem;font-weight:700;color:var(--text-primary);margin:0 0 1rem;">Pengajuan Izin / Cuti</h3>
+          <!-- Form -->
+          <div style="display:flex;flex-direction:column;gap:0.85rem;">
+            <div>
+              <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Tipe</label>
+              <select id="izin-tipe" class="field field-light" style="padding:0.65rem 1rem;">
+                <option value="">— Pilih Tipe —</option>
+                <option value="Izin">Izin</option>
+                <option value="Sakit">Sakit</option>
+                <option value="Cuti">Cuti</option>
+                <option value="WFH">Work From Home</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:0.75rem;">
+              <div style="flex:1;">
+                <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Dari Tanggal</label>
+                <input type="date" id="izin-dari" class="field field-light" style="padding:0.65rem 1rem;" />
+              </div>
+              <div style="flex:1;">
+                <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Sampai Tanggal</label>
+                <input type="date" id="izin-sampai" class="field field-light" style="padding:0.65rem 1rem;" />
+              </div>
+            </div>
+            <div>
+              <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--text-muted);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">Alasan</label>
+              <textarea id="izin-alasan" class="field field-light" rows="3" placeholder="Jelaskan alasan pengajuan..." style="resize:vertical;padding:0.65rem 1rem;"></textarea>
+            </div>
+            <button onclick="submitIzin()" class="btn btn-primary" style="width:100%;margin-top:0.25rem;">
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+              Kirim Pengajuan
+            </button>
+          </div>
+        </div>
 
-        <button id="btn-checkin" onclick="handleAbsensi('Check-In')"
-          class="btn btn-checkin"
-          style="width:100%;border-radius:14px;">
-          <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
-          </svg>
-          Check-In
-        </button>
-
-        <button id="btn-checkout" onclick="handleAbsensi('Check-Out')"
-          class="btn btn-checkout"
-          style="width:100%;border-radius:14px;">
-          <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-          </svg>
-          Check-Out
-        </button>
-
+        <!-- Riwayat Pengajuan -->
+        <div class="card" style="width:100%;overflow:hidden;">
+          <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--border-lighter);">
+            <h4 style="font-size:0.875rem;font-weight:700;color:var(--text-primary);margin:0;">Riwayat Pengajuan</h4>
+          </div>
+          <div id="izin-list" style="max-height:300px;overflow-y:auto;padding:0.5rem;">
+            <p style="text-align:center;color:var(--text-muted);font-size:0.82rem;padding:1.5rem;">Belum ada pengajuan</p>
+          </div>
+        </div>
       </div>
-
-      <!-- Geolocation note -->
-      <p class="anim-slide" style="color:#94a3b8;font-size:0.78rem;text-align:center;margin:0;display:flex;align-items:center;gap:0.3rem;">
-        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-          <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-        </svg>
-        Koordinat GPS otomatis diambil saat absen
-      </p>
-
     </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" onclick="switchKaryawanTab('absen')" id="nav-absen">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Absen
+      </button>
+      <button class="nav-item" onclick="switchKaryawanTab('riwayat')" id="nav-riwayat">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Riwayat
+      </button>
+      <button class="nav-item" onclick="switchKaryawanTab('izin')" id="nav-izin">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Izin/Cuti
+      </button>
+    </nav>
   </div>
+
 
   <!-- ═══════════════════════════════════════════════
        VIEW 3: ADMIN DASHBOARD
   ═══════════════════════════════════════════════ -->
-  <div id="view-admin" class="view" style="flex-direction:column;min-height:100vh;background:#f1f5f9;">
+  <div id="view-admin" class="view" style="flex-direction:column;min-height:100vh;background:var(--bg-primary);">
 
     <!-- Top bar -->
-    <header style="background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);padding:0.9rem 1.25rem;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(0,0,0,0.2);">
+    <header style="background:var(--header-bg);padding:0.9rem 1.25rem;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(0,0,0,0.2);">
       <div style="display:flex;align-items:center;gap:0.75rem;">
         <div style="width:36px;height:36px;border-radius:10px;background:rgba(99,102,241,0.4);display:flex;align-items:center;justify-content:center;">
-          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="1.8">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-          </svg>
+          <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="white" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
         </div>
         <div>
           <p id="admin-nama" style="color:white;font-weight:600;font-size:0.9rem;margin:0;line-height:1.2;"></p>
           <p style="color:rgba(99,102,241,0.8);font-size:0.72rem;margin:0;font-weight:500;">Administrator</p>
         </div>
       </div>
-      <button onclick="handleLogout()" class="btn btn-ghost" style="font-size:0.8rem;">
-        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-        </svg>
-        Keluar
-      </button>
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <button class="dark-toggle" onclick="toggleDarkMode()" title="Toggle Dark Mode"></button>
+        <button onclick="handleLogout()" class="btn btn-ghost" style="font-size:0.8rem;">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          Keluar
+        </button>
+      </div>
     </header>
 
     <!-- Tab bar -->
-    <div style="background:white;border-bottom:1px solid #e2e8f0;padding:0.6rem 1.25rem;display:flex;gap:0.5rem;position:sticky;top:0;z-index:10;">
-      <button id="tab-btn-users"   class="tab-btn active" onclick="switchAdminTab('users')">
-        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:5px;vertical-align:-2px;">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/>
-        </svg>
-        Data Karyawan
+    <div style="background:var(--tab-bg);border-bottom:1px solid var(--border-light);padding:0.6rem 1.25rem;display:flex;gap:0.5rem;position:sticky;top:0;z-index:10;overflow-x:auto;">
+      <button id="tab-btn-users" class="tab-btn active" onclick="switchAdminTab('users')">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:4px;vertical-align:-2px;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        Karyawan
       </button>
       <button id="tab-btn-absensi" class="tab-btn" onclick="switchAdminTab('absensi')">
-        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:5px;vertical-align:-2px;">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
-        </svg>
-        Absensi Hari Ini
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:4px;vertical-align:-2px;"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+        Absensi
+      </button>
+      <button id="tab-btn-pengajuan" class="tab-btn" onclick="switchAdminTab('pengajuan')">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="display:inline;margin-right:4px;vertical-align:-2px;"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        Pengajuan
       </button>
     </div>
 
     <!-- Tab: Users -->
     <div id="tab-users" style="padding:1.25rem;flex:1;">
       <div class="card" style="overflow:hidden;">
-        <div style="padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f1f5f9;">
+        <div style="padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-lighter);">
           <div>
-            <h3 style="font-size:0.9375rem;font-weight:700;color:#0f172a;margin:0;">Daftar Karyawan</h3>
-            <p id="users-count" style="color:#94a3b8;font-size:0.78rem;margin:0.1rem 0 0;"></p>
+            <h3 style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);margin:0;">Daftar Karyawan</h3>
+            <p id="users-count" style="color:var(--text-muted);font-size:0.78rem;margin:0.1rem 0 0;"></p>
           </div>
-          <button onclick="loadUsers()" class="btn btn-sm" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-size:0.78rem;">
-            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
+          <button onclick="loadUsers()" class="btn btn-sm btn-outline" style="font-size:0.78rem;">
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
             Refresh
           </button>
         </div>
         <div class="scroll-x">
           <table class="data-table">
-            <thead>
-              <tr>
-                <th>ID Karyawan</th>
-                <th>Nama</th>
-                <th>Role</th>
-                <th>Aksi</th>
-              </tr>
-            </thead>
-            <tbody id="users-tbody">
-              <tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:2rem;">Memuat data…</td></tr>
-            </tbody>
+            <thead><tr><th>ID</th><th>Nama</th><th>Role</th><th>Aksi</th></tr></thead>
+            <tbody id="users-tbody"></tbody>
           </table>
         </div>
       </div>
@@ -595,99 +905,178 @@
     <!-- Tab: Absensi -->
     <div id="tab-absensi" style="padding:1.25rem;flex:1;display:none;">
       <div class="card" style="overflow:hidden;">
-        <div style="padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f1f5f9;">
+        <div style="padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-lighter);">
           <div>
-            <h3 style="font-size:0.9375rem;font-weight:700;color:#0f172a;margin:0;">Absensi Hari Ini</h3>
-            <p id="absensi-date-label" style="color:#94a3b8;font-size:0.78rem;margin:0.1rem 0 0;"></p>
+            <h3 style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);margin:0;">Absensi Hari Ini</h3>
+            <p id="absensi-date-label" style="color:var(--text-muted);font-size:0.78rem;margin:0.1rem 0 0;"></p>
           </div>
-          <button onclick="loadTodayAbsensi()" class="btn btn-sm" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-size:0.78rem;">
-            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-            </svg>
+          <button onclick="loadTodayAbsensi()" class="btn btn-sm btn-outline" style="font-size:0.78rem;">
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
             Refresh
           </button>
         </div>
         <div class="scroll-x">
           <table class="data-table">
-            <thead>
-              <tr>
-                <th>Waktu</th>
-                <th>ID</th>
-                <th>Nama</th>
-                <th>Status</th>
-                <th>Lokasi</th>
-              </tr>
-            </thead>
-            <tbody id="absensi-tbody">
-              <tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:2rem;">Memuat data…</td></tr>
-            </tbody>
+            <thead><tr><th>Waktu</th><th>ID</th><th>Nama</th><th>Status</th><th>Keterangan</th><th>Lokasi</th></tr></thead>
+            <tbody id="absensi-tbody"></tbody>
           </table>
         </div>
       </div>
     </div>
 
+    <!-- Tab: Pengajuan -->
+    <div id="tab-pengajuan" style="padding:1.25rem;flex:1;display:none;">
+      <div class="card" style="overflow:hidden;">
+        <div style="padding:1rem 1.25rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border-lighter);">
+          <div>
+            <h3 style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);margin:0;">Pengajuan Izin / Cuti</h3>
+            <p id="pengajuan-count" style="color:var(--text-muted);font-size:0.78rem;margin:0.1rem 0 0;"></p>
+          </div>
+          <button onclick="loadPengajuan()" class="btn btn-sm btn-outline" style="font-size:0.78rem;">
+            <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Refresh
+          </button>
+        </div>
+        <div id="pengajuan-list" style="padding:0.75rem;"></div>
+      </div>
+    </div>
+
   </div><!-- /view-admin -->
+
 
   <!-- ═══════════════════════════════════════════════
        JAVASCRIPT
   ═══════════════════════════════════════════════ -->
   <script>
     /* ──────────────────────────────────────────────
-       CONFIG — paste your deployed GAS URL here
+       CONFIG
     ────────────────────────────────────────────── */
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwGvMiTUy34ZZji27LeqMlOjL4IRRZ_TE-o--Zrgn7OUWg_B0Ia5k4F_7kIqVBDMyDv/exec'; // <── PASTE GAS WEB APP URL
+    const GAS_URL = ''; // <-- Paste your deployed GAS URL here
+
+    // Geofencing config: set your office coordinates & radius (meters)
+    const OFFICE_LAT    = -6.200000;  // Latitude kantor
+    const OFFICE_LON    = 106.816666; // Longitude kantor
+    const GEOFENCE_RADIUS = 100;      // Radius dalam meter
+
+    // Jam kerja standar (untuk deteksi telat/lembur)
+    const JAM_MASUK  = '08:00'; // Format HH:mm
+    const JAM_PULANG = '17:00';
+    const TOLERANSI_MENIT = 15; // Toleransi keterlambatan
 
     /* ──────────────────────────────────────────────
        STATE
     ────────────────────────────────────────────── */
-    let currentUser   = null;
-    let clockInterval = null;
+    let currentUser    = null;
+    let clockInterval  = null;
+    let selfieStream   = null;
+    let selfieDataUrl  = null;
+    let pendingAbsensi = null;
+    let gpsReject      = null;
+    let riwayatMonth   = new Date();
+
+    /* ──────────────────────────────────────────────
+       DARK MODE
+    ────────────────────────────────────────────── */
+    function initDarkMode() {
+      const saved = localStorage.getItem('absensi_dark_mode');
+      if (saved === 'true' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        document.documentElement.classList.add('dark');
+      }
+    }
+    function toggleDarkMode() {
+      document.documentElement.classList.toggle('dark');
+      localStorage.setItem('absensi_dark_mode', document.documentElement.classList.contains('dark'));
+    }
+    initDarkMode();
+
+
+    /* ──────────────────────────────────────────────
+       CUSTOM MODAL (replace confirm/alert)
+    ────────────────────────────────────────────── */
+    function showModal({ icon, title, message, actions }) {
+      const overlay = document.getElementById('custom-modal');
+      const iconEl  = document.getElementById('modal-icon');
+      const titleEl = document.getElementById('modal-title');
+      const msgEl   = document.getElementById('modal-message');
+      const actEl   = document.getElementById('modal-actions');
+
+      iconEl.innerHTML  = icon || '';
+      titleEl.textContent = title || '';
+      msgEl.textContent   = message || '';
+      actEl.innerHTML     = '';
+
+      actions.forEach(a => {
+        const btn = document.createElement('button');
+        btn.className = `btn ${a.class || 'btn-outline'}`;
+        btn.textContent = a.label;
+        btn.onclick = () => { closeModal(); if (a.onClick) a.onClick(); };
+        actEl.appendChild(btn);
+      });
+
+      overlay.classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('custom-modal').classList.remove('active');
+    }
+
+    function confirmModal(title, message, onConfirm) {
+      showModal({
+        icon: `<div style="width:56px;height:56px;border-radius:50%;background:rgba(99,102,241,0.12);display:inline-flex;align-items:center;justify-content:center;">
+          <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#6366f1" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>`,
+        title,
+        message,
+        actions: [
+          { label: 'Batal', class: 'btn-outline' },
+          { label: 'Ya, Lanjutkan', class: 'btn-primary', onClick: onConfirm }
+        ]
+      });
+    }
 
     /* ──────────────────────────────────────────────
        API LAYER
-       Uses GET with ?data=<JSON> for reliable CORS.
-       GAS forwards to doGet(); no preflight issues.
     ────────────────────────────────────────────── */
     async function apiCall(payload) {
       const encoded  = encodeURIComponent(JSON.stringify(payload));
       const url      = `${GAS_URL}?data=${encoded}`;
-
-      const response = await fetch(url, {
-        method   : 'GET',
-        redirect : 'follow',
-        cache    : 'no-cache',
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
+      const response = await fetch(url, { method: 'GET', redirect: 'follow', cache: 'no-cache' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const text = await response.text();
-      try {
-        return JSON.parse(text);
-      } catch (e) {
-        throw new Error('Server mengembalikan response yang tidak valid. Periksa GAS URL Anda.');
-      }
+      try { return JSON.parse(text); }
+      catch (e) { throw new Error('Server mengembalikan response tidak valid.'); }
     }
 
     /* ──────────────────────────────────────────────
        VIEW MANAGEMENT
     ────────────────────────────────────────────── */
     function showView(name) {
-      document.querySelectorAll('.view').forEach(el => {
-        el.classList.remove('active');
-      });
+      document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
       const target = document.getElementById('view-' + name);
       if (target) {
         target.classList.add('active');
-        // Re-trigger animations
         target.querySelectorAll('.anim-slide, .anim-fade').forEach(el => {
-          el.style.animation = 'none';
-          el.offsetHeight;   // reflow
-          el.style.animation = '';
+          el.style.animation = 'none'; el.offsetHeight; el.style.animation = '';
         });
       }
     }
+
+    /* ──────────────────────────────────────────────
+       SKELETON LOADERS
+    ────────────────────────────────────────────── */
+    function showSkeleton(tbody, cols, rows = 5) {
+      let html = '';
+      for (let i = 0; i < rows; i++) {
+        html += '<tr>';
+        for (let j = 0; j < cols; j++) {
+          const w = 40 + Math.random() * 40;
+          html += `<td><div class="skeleton" style="height:14px;width:${w}%;"></div></td>`;
+        }
+        html += '</tr>';
+      }
+      tbody.innerHTML = html;
+    }
+
 
     /* ──────────────────────────────────────────────
        LOGIN
@@ -698,158 +1087,138 @@
       const btn      = document.getElementById('login-btn');
       const label    = document.getElementById('login-btn-label');
       const errBox   = document.getElementById('login-error');
-      const errText  = document.getElementById('login-error-text');
 
       const id  = idInput.value.trim();
       const pin = pinInput.value.trim();
-
       errBox.style.display = 'none';
 
-      if (!id || !pin) {
-        showLoginError('ID Karyawan dan PIN tidak boleh kosong.');
-        return;
-      }
+      if (!id || !pin) { showLoginError('ID Karyawan dan PIN tidak boleh kosong.'); return; }
 
-      // Loading state
-      btn.disabled  = true;
+      btn.disabled = true;
       label.innerHTML = '<span class="spinner"></span>&nbsp;Memverifikasi…';
 
       try {
         const res = await apiCall({ action: 'login', id_karyawan: id, pin: pin });
-
         if (res.success) {
           currentUser = res.user;
           localStorage.setItem('absensi_fsr_user', JSON.stringify(currentUser));
-          pinInput.value = ''; // Clear PIN from DOM
-
+          pinInput.value = '';
           if (currentUser.role === 'Admin') {
-            setupAdminView();
-            showView('admin');
-            loadUsers();
-            loadTodayAbsensi();
+            setupAdminView(); showView('admin'); loadUsers(); loadTodayAbsensi();
           } else {
-            setupKaryawanView();
-            showView('karyawan');
+            setupKaryawanView(); showView('karyawan');
           }
           startClock();
         } else {
-          showLoginError(res.message || 'Login gagal. Coba lagi.');
+          showLoginError(res.message || 'Login gagal.');
         }
       } catch (err) {
-        showLoginError('Gagal terhubung ke server. ' + err.message);
+        showLoginError('Gagal terhubung: ' + err.message);
       } finally {
-        btn.disabled = false;
-        label.textContent = 'Masuk';
+        btn.disabled = false; label.textContent = 'Masuk';
       }
     }
 
     function showLoginError(msg) {
-      const errBox  = document.getElementById('login-error');
-      const errText = document.getElementById('login-error-text');
-      errText.textContent = msg;
+      const errBox = document.getElementById('login-error');
+      document.getElementById('login-error-text').textContent = msg;
       errBox.style.display = 'flex';
     }
 
     function togglePinVisibility() {
-      const input   = document.getElementById('login-pin');
-      const icon    = document.getElementById('pin-eye-icon');
+      const input = document.getElementById('login-pin');
+      const icon  = document.getElementById('pin-eye-icon');
       const isHidden = input.type === 'password';
       input.type = isHidden ? 'text' : 'password';
-
-      // Swap icon path
-      if (isHidden) {
-        // Show "eye-off"
-        icon.innerHTML = `
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
-        `;
-      } else {
-        // Show "eye"
-        icon.innerHTML = `
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-          <path stroke-linecap="round" stroke-linejoin="round"
-            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-        `;
-      }
+      icon.innerHTML = isHidden
+        ? `<path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>`
+        : `<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>`;
     }
 
     /* ──────────────────────────────────────────────
        LOGOUT
     ────────────────────────────────────────────── */
     function handleLogout() {
-      currentUser = null;
-      localStorage.removeItem('absensi_fsr_user');
-      stopClock();
-      document.getElementById('login-id').value  = '';
-      document.getElementById('login-pin').value = '';
-      document.getElementById('login-error').style.display = 'none';
-      showView('login');
+      confirmModal('Keluar dari Akun?', 'Anda akan keluar dari sistem absensi.', () => {
+        currentUser = null;
+        localStorage.removeItem('absensi_fsr_user');
+        stopClock();
+        document.getElementById('login-id').value = '';
+        document.getElementById('login-pin').value = '';
+        document.getElementById('login-error').style.display = 'none';
+        showView('login');
+      });
     }
 
+
     /* ──────────────────────────────────────────────
-       KARYAWAN SETUP
+       KARYAWAN SETUP & TABS
     ────────────────────────────────────────────── */
     function setupKaryawanView() {
       document.getElementById('karyawan-nama').textContent = currentUser.nama;
-      document.getElementById('karyawan-id').textContent  = 'ID: ' + currentUser.id_karyawan;
+      document.getElementById('karyawan-id').textContent   = 'ID: ' + currentUser.id_karyawan;
+      loadTodayStatus();
+    }
+
+    function switchKaryawanTab(tab) {
+      ['absen', 'riwayat', 'izin'].forEach(t => {
+        const el = document.getElementById('karyawan-tab-' + t);
+        const nav = document.getElementById('nav-' + t);
+        if (t === tab) {
+          el.style.display = 'flex'; nav.classList.add('active');
+        } else {
+          el.style.display = 'none'; nav.classList.remove('active');
+        }
+      });
+      if (tab === 'riwayat') renderCalendar();
+      if (tab === 'izin') loadMyIzin();
     }
 
     /* ──────────────────────────────────────────────
        CLOCK
     ────────────────────────────────────────────── */
-    function startClock() {
-      updateClock();
-      clockInterval = setInterval(updateClock, 1000);
-    }
-
-    function stopClock() {
-      if (clockInterval) { clearInterval(clockInterval); clockInterval = null; }
-    }
+    function startClock() { updateClock(); clockInterval = setInterval(updateClock, 1000); }
+    function stopClock() { if (clockInterval) { clearInterval(clockInterval); clockInterval = null; } }
 
     function updateClock() {
-      const now  = new Date();
+      const now = new Date();
       const opts = { timeZone: 'Asia/Jakarta', hour12: false };
-
       const H = now.toLocaleString('id-ID', { ...opts, hour: '2-digit' }).padStart(2, '0');
       const M = now.toLocaleString('id-ID', { ...opts, minute: '2-digit' }).padStart(2, '0');
       const S = now.toLocaleString('id-ID', { ...opts, second: '2-digit' }).padStart(2, '0');
 
       const clockEl = document.getElementById('clock');
       if (clockEl) clockEl.textContent = `${H}:${M}:${S}`;
-
-      const dateEl  = document.getElementById('clock-date');
-      if (dateEl) {
-        dateEl.textContent = now.toLocaleDateString('id-ID', {
-          timeZone: 'Asia/Jakarta',
-          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-        });
-      }
+      const dateEl = document.getElementById('clock-date');
+      if (dateEl) dateEl.textContent = now.toLocaleDateString('id-ID', {
+        timeZone: 'Asia/Jakarta', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      });
     }
 
     /* ──────────────────────────────────────────────
-       GEOLOCATION
+       GEOLOCATION + GEOFENCING
     ────────────────────────────────────────────── */
     function getLocation() {
       return new Promise((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error('Browser Anda tidak mendukung Geolocation.'));
-          return;
-        }
-
+        if (!navigator.geolocation) { reject(new Error('Browser tidak mendukung Geolocation.')); return; }
         document.getElementById('gps-overlay').classList.remove('hidden');
+        gpsReject = reject;
 
         navigator.geolocation.getCurrentPosition(
           (pos) => {
             document.getElementById('gps-overlay').classList.add('hidden');
-            resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+            gpsReject = null;
+            const coords = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+            updateGeofenceStatus(coords);
+            resolve(coords);
           },
           (err) => {
             document.getElementById('gps-overlay').classList.add('hidden');
+            gpsReject = null;
             const msgs = {
-              1: 'Izin lokasi ditolak. Aktifkan izin lokasi di pengaturan browser Anda, lalu coba lagi.',
-              2: 'Lokasi tidak dapat ditentukan. Pastikan GPS aktif dan coba lagi.',
-              3: 'Waktu mendapatkan lokasi habis. Pastikan sinyal GPS cukup dan coba lagi.',
+              1: 'Izin lokasi ditolak. Aktifkan di pengaturan browser.',
+              2: 'Lokasi tidak dapat ditentukan. Pastikan GPS aktif.',
+              3: 'Waktu mendapatkan lokasi habis.',
             };
             reject(new Error(msgs[err.code] || 'Gagal mendapatkan lokasi.'));
           },
@@ -858,28 +1227,207 @@
       });
     }
 
+    function cancelGPS() {
+      document.getElementById('gps-overlay').classList.add('hidden');
+      if (gpsReject) { gpsReject(new Error('Dibatalkan oleh pengguna.')); gpsReject = null; }
+    }
+
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const toRad = x => x * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function updateGeofenceStatus(coords) {
+      const dist = calculateDistance(coords.lat, coords.lon, OFFICE_LAT, OFFICE_LON);
+      const el = document.getElementById('geofence-status');
+      if (dist <= GEOFENCE_RADIUS) {
+        el.className = 'geofence-badge geofence-in';
+        el.textContent = '✓ Di area kantor';
+      } else {
+        el.className = 'geofence-badge geofence-out';
+        el.textContent = `⚠ ${Math.round(dist)}m dari kantor`;
+      }
+    }
+
+
     /* ──────────────────────────────────────────────
-       SUBMIT ABSENSI
+       SELFIE CAMERA
     ────────────────────────────────────────────── */
-    async function handleAbsensi(tipe) {
-      const btnId  = tipe === 'Check-In' ? 'btn-checkin' : 'btn-checkout';
-      const btn    = document.getElementById(btnId);
+    async function openSelfieCamera() {
+      return new Promise(async (resolve, reject) => {
+        try {
+          selfieStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'user', width: 480, height: 480 }
+          });
+          const video = document.getElementById('selfie-video');
+          video.srcObject = selfieStream;
+          video.style.display = 'block';
+          document.getElementById('selfie-preview').classList.add('hidden');
+          document.getElementById('selfie-actions').style.display = 'flex';
+          document.getElementById('selfie-confirm-actions').style.display = 'none';
+          document.getElementById('selfie-overlay').classList.remove('hidden');
+
+          // Store resolve/reject for later
+          window._selfieResolve = resolve;
+          window._selfieReject  = reject;
+        } catch (err) {
+          reject(new Error('Gagal akses kamera. Izinkan akses kamera di browser Anda.'));
+        }
+      });
+    }
+
+    function captureSelfie() {
+      const video  = document.getElementById('selfie-video');
+      const canvas = document.getElementById('selfie-canvas');
+      const ctx    = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, 480, 480);
+      selfieDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+      // Show preview
+      const preview = document.getElementById('selfie-preview');
+      preview.src = selfieDataUrl;
+      preview.classList.remove('hidden');
+      video.style.display = 'none';
+      document.getElementById('selfie-actions').style.display = 'none';
+      document.getElementById('selfie-confirm-actions').style.display = 'flex';
+    }
+
+    function confirmSelfie() {
+      stopSelfieStream();
+      document.getElementById('selfie-overlay').classList.add('hidden');
+      if (window._selfieResolve) window._selfieResolve(selfieDataUrl);
+    }
+
+    function retakeSelfie() {
+      const video = document.getElementById('selfie-video');
+      video.style.display = 'block';
+      document.getElementById('selfie-preview').classList.add('hidden');
+      document.getElementById('selfie-actions').style.display = 'flex';
+      document.getElementById('selfie-confirm-actions').style.display = 'none';
+      selfieDataUrl = null;
+    }
+
+    function cancelSelfie() {
+      stopSelfieStream();
+      document.getElementById('selfie-overlay').classList.add('hidden');
+      if (window._selfieReject) window._selfieReject(new Error('Selfie dibatalkan.'));
+    }
+
+    function stopSelfieStream() {
+      if (selfieStream) {
+        selfieStream.getTracks().forEach(t => t.stop());
+        selfieStream = null;
+      }
+    }
+
+    /* ──────────────────────────────────────────────
+       STATUS CERDAS (Tepat Waktu / Telat / Lembur)
+    ────────────────────────────────────────────── */
+    function getAttendanceStatus(checkinTime, checkoutTime) {
+      if (!checkinTime) return null;
+
+      const [jamMasukH, jamMasukM] = JAM_MASUK.split(':').map(Number);
+      const [jamPulangH, jamPulangM] = JAM_PULANG.split(':').map(Number);
+      const batasTelat = jamMasukH * 60 + jamMasukM + TOLERANSI_MENIT;
+
+      // Parse checkin time (format: HH:MM:SS)
+      const [ciH, ciM] = checkinTime.split(':').map(Number);
+      const ciMinutes = ciH * 60 + ciM;
+
+      let status = { type: 'tepat', label: '✓ Tepat Waktu', class: 'badge-tepat' };
+
+      if (ciMinutes > batasTelat) {
+        const telatMnt = ciMinutes - (jamMasukH * 60 + jamMasukM);
+        status = { type: 'telat', label: `⚠ Telat ${telatMnt} menit`, class: 'badge-telat' };
+      }
+
+      // Check lembur
+      if (checkoutTime) {
+        const [coH, coM] = checkoutTime.split(':').map(Number);
+        const coMinutes = coH * 60 + coM;
+        const batasPulang = jamPulangH * 60 + jamPulangM;
+        if (coMinutes > batasPulang + 30) {
+          const lemburMnt = coMinutes - batasPulang;
+          const lemburJam = Math.floor(lemburMnt / 60);
+          const lemburSisa = lemburMnt % 60;
+          const label = lemburJam > 0 ? `🌙 Lembur ${lemburJam}j ${lemburSisa}m` : `🌙 Lembur ${lemburSisa}m`;
+          status = { type: 'lembur', label, class: 'badge-lembur' };
+        }
+      }
+
+      return status;
+    }
+
+    function updateAttendanceBadge(checkinTime, checkoutTime) {
+      const badge = document.getElementById('attendance-badge');
+      const status = getAttendanceStatus(checkinTime, checkoutTime);
+      if (status) {
+        badge.textContent = status.label;
+        badge.className = `badge ${status.class}`;
+        badge.style.display = 'inline-flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+
+    /* ──────────────────────────────────────────────
+       ABSENSI FLOW (Selfie → GPS → Submit)
+    ────────────────────────────────────────────── */
+    async function startAbsensiFlow(tipe) {
+      const btnId = tipe === 'Check-In' ? 'btn-checkin' : 'btn-checkout';
+      const btn = document.getElementById(btnId);
       const origHtml = btn.innerHTML;
 
-      btn.disabled  = true;
+      // Confirm Check-Out
+      if (tipe === 'Check-Out') {
+        showModal({
+          icon: `<div style="width:56px;height:56px;border-radius:50%;background:rgba(239,68,68,0.12);display:inline-flex;align-items:center;justify-content:center;">
+            <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#ef4444" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+          </div>`,
+          title: 'Konfirmasi Check-Out',
+          message: 'Pastikan Anda sudah selesai bekerja hari ini. Proses ini memerlukan selfie dan lokasi GPS.',
+          actions: [
+            { label: 'Batal', class: 'btn-outline' },
+            { label: 'Lanjut Check-Out', class: 'btn-danger', onClick: () => executeAbsensi(tipe, btn, origHtml) }
+          ]
+        });
+        return;
+      }
+
+      executeAbsensi(tipe, btn, origHtml);
+    }
+
+    async function executeAbsensi(tipe, btn, origHtml) {
+      btn.disabled = true;
       btn.innerHTML = `<span class="spinner"></span>&nbsp;Proses…`;
 
       try {
-        // Step 1: Get location
+        // Step 1: Take selfie
+        let selfie;
+        try {
+          selfie = await openSelfieCamera();
+        } catch (err) {
+          showToast(err.message, 'error'); return;
+        }
+
+        // Step 2: Get GPS location
         let coords;
         try {
           coords = await getLocation();
-        } catch (locErr) {
-          showToast(locErr.message, 'error');
-          return;
+        } catch (err) {
+          showToast(err.message, 'error'); return;
         }
 
-        // Step 2: Submit to GAS
+        // Step 3: Check geofence
+        const distance = calculateDistance(coords.lat, coords.lon, OFFICE_LAT, OFFICE_LON);
+        const isInRadius = distance <= GEOFENCE_RADIUS;
+
+        // Step 4: Submit to GAS
         const res = await apiCall({
           action      : 'submitAbsensi',
           id_karyawan : currentUser.id_karyawan,
@@ -887,46 +1435,283 @@
           tipe_absen  : tipe,
           latitude    : coords.lat,
           longitude   : coords.lon,
+          selfie      : selfie,
+          in_radius   : isInRadius,
+          distance    : Math.round(distance),
         });
 
         if (res.success) {
-          showToast(res.message + (res.timestamp ? ' (' + res.timestamp.substring(11,19) + ' WIB)' : ''), 'success');
-          updateStatusDisplay(tipe, res.timestamp ? res.timestamp.substring(11,19) : '--:--:--');
+          const timeStr = res.timestamp ? res.timestamp.substring(11, 19) : '--:--:--';
+          showToast(res.message + ' (' + timeStr + ' WIB)' + (!isInRadius ? ' ⚠ Di luar radius' : ''), 'success');
+          updateStatusDisplay(tipe, timeStr);
+
+          // Update status cerdas
+          const ci = document.getElementById('status-checkin').textContent.replace(' WIB', '');
+          const co = document.getElementById('status-checkout').textContent.replace(' WIB', '');
+          updateAttendanceBadge(ci !== '—' ? ci : null, co !== '—' ? co : null);
         } else {
           showToast(res.message, 'error');
         }
-
       } catch (err) {
-        showToast('Gagal terhubung ke server: ' + err.message, 'error');
+        showToast('Gagal: ' + err.message, 'error');
       } finally {
-        btn.disabled  = false;
+        btn.disabled = false;
         btn.innerHTML = origHtml;
       }
     }
 
     function updateStatusDisplay(tipe, timeStr) {
       if (tipe === 'Check-In') {
-        document.getElementById('status-checkin').textContent  = timeStr + ' WIB';
+        document.getElementById('status-checkin').textContent = timeStr + ' WIB';
       } else {
         document.getElementById('status-checkout').textContent = timeStr + ' WIB';
       }
     }
 
     /* ──────────────────────────────────────────────
-       ADMIN SETUP
+       LOAD TODAY STATUS (for karyawan)
+    ────────────────────────────────────────────── */
+    async function loadTodayStatus() {
+      try {
+        const res = await apiCall({ action: 'getMyTodayStatus', id_karyawan: currentUser.id_karyawan });
+        if (res.success && res.checkin) {
+          document.getElementById('status-checkin').textContent = res.checkin + ' WIB';
+          if (res.checkout) document.getElementById('status-checkout').textContent = res.checkout + ' WIB';
+          updateAttendanceBadge(res.checkin, res.checkout || null);
+        }
+      } catch (e) { /* silent */ }
+    }
+
+
+    /* ──────────────────────────────────────────────
+       RIWAYAT ABSENSI + CALENDAR
+    ────────────────────────────────────────────── */
+    function changeMonth(delta) {
+      riwayatMonth.setMonth(riwayatMonth.getMonth() + delta);
+      renderCalendar();
+    }
+
+    async function renderCalendar() {
+      const year = riwayatMonth.getFullYear();
+      const month = riwayatMonth.getMonth();
+      const monthNames = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+      document.getElementById('riwayat-month').textContent = `${monthNames[month]} ${year}`;
+
+      const calEl = document.getElementById('riwayat-calendar');
+      calEl.innerHTML = '<div class="skeleton" style="height:200px;width:100%;grid-column:span 7;"></div>';
+
+      try {
+        const res = await apiCall({
+          action: 'getMyMonthly',
+          id_karyawan: currentUser.id_karyawan,
+          year, month: month + 1
+        });
+
+        const records = res.success ? (res.records || {}) : {};
+        const today = new Date();
+        const firstDay = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+        let html = '';
+        // Empty cells before first day
+        for (let i = 0; i < firstDay; i++) html += '<div class="cal-day empty"></div>';
+
+        let hadir = 0, telat = 0, alpa = 0, izin = 0;
+
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const isToday = (today.getFullYear() === year && today.getMonth() === month && today.getDate() === d);
+          const dayOfWeek = new Date(year, month, d).getDay();
+          const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+          let cls = '';
+          const rec = records[dateStr];
+
+          if (rec) {
+            if (rec.status === 'izin' || rec.status === 'cuti' || rec.status === 'sakit' || rec.status === 'wfh') {
+              cls = 'izin'; izin++;
+            } else if (rec.status === 'telat') {
+              cls = 'telat'; telat++;
+            } else {
+              cls = 'hadir'; hadir++;
+            }
+          } else if (!isWeekend && new Date(year, month, d) < today && !(year === today.getFullYear() && month === today.getMonth() && d === today.getDate())) {
+            cls = 'alpa'; alpa++;
+          }
+
+          html += `<div class="cal-day ${cls} ${isToday ? 'today' : ''}" title="${dateStr}">${d}</div>`;
+        }
+
+        calEl.innerHTML = html;
+
+        // Summary
+        document.getElementById('riwayat-summary').innerHTML = `
+          <span class="badge badge-tepat">${hadir} Hadir</span>
+          <span class="badge badge-telat">${telat} Telat</span>
+          <span class="badge badge-checkout">${alpa} Alpa</span>
+          <span class="badge badge-admin">${izin} Izin/Cuti</span>
+        `;
+      } catch (err) {
+        calEl.innerHTML = `<p style="grid-column:span 7;text-align:center;color:var(--text-muted);font-size:0.82rem;padding:2rem;">Gagal memuat data</p>`;
+      }
+    }
+
+
+    /* ──────────────────────────────────────────────
+       PENGAJUAN IZIN / CUTI
+    ────────────────────────────────────────────── */
+    async function submitIzin() {
+      const tipe   = document.getElementById('izin-tipe').value;
+      const dari   = document.getElementById('izin-dari').value;
+      const sampai = document.getElementById('izin-sampai').value;
+      const alasan = document.getElementById('izin-alasan').value.trim();
+
+      if (!tipe || !dari || !sampai || !alasan) {
+        showToast('Semua field wajib diisi.', 'error'); return;
+      }
+      if (new Date(sampai) < new Date(dari)) {
+        showToast('Tanggal akhir harus setelah tanggal mulai.', 'error'); return;
+      }
+
+      confirmModal('Kirim Pengajuan?', `${tipe} dari ${dari} s/d ${sampai}`, async () => {
+        try {
+          const res = await apiCall({
+            action: 'submitIzin',
+            id_karyawan: currentUser.id_karyawan,
+            nama: currentUser.nama,
+            tipe, dari, sampai, alasan
+          });
+          if (res.success) {
+            showToast('Pengajuan berhasil dikirim!', 'success');
+            document.getElementById('izin-tipe').value = '';
+            document.getElementById('izin-dari').value = '';
+            document.getElementById('izin-sampai').value = '';
+            document.getElementById('izin-alasan').value = '';
+            loadMyIzin();
+          } else {
+            showToast(res.message || 'Gagal mengirim pengajuan.', 'error');
+          }
+        } catch (err) {
+          showToast('Error: ' + err.message, 'error');
+        }
+      });
+    }
+
+    async function loadMyIzin() {
+      const list = document.getElementById('izin-list');
+      list.innerHTML = '<div class="skeleton" style="height:60px;margin:0.5rem;"></div>'.repeat(3);
+
+      try {
+        const res = await apiCall({ action: 'getMyIzin', id_karyawan: currentUser.id_karyawan });
+        if (!res.success || !res.records || res.records.length === 0) {
+          list.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:0.82rem;padding:1.5rem;">Belum ada pengajuan</p>';
+          return;
+        }
+
+        list.innerHTML = res.records.map(r => {
+          const statusBadge = r.status === 'Approved'
+            ? '<span class="badge badge-approved">Disetujui</span>'
+            : r.status === 'Rejected'
+            ? '<span class="badge badge-rejected">Ditolak</span>'
+            : '<span class="badge badge-pending">Menunggu</span>';
+          return `
+            <div style="padding:0.75rem;border-bottom:1px solid var(--border-lighter);display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <p style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin:0;">${escHtml(r.tipe)} · ${escHtml(r.dari)} → ${escHtml(r.sampai)}</p>
+                <p style="font-size:0.72rem;color:var(--text-muted);margin:0.2rem 0 0;">${escHtml(r.alasan)}</p>
+              </div>
+              ${statusBadge}
+            </div>`;
+        }).join('');
+      } catch (err) {
+        list.innerHTML = `<p style="text-align:center;color:var(--text-muted);font-size:0.82rem;padding:1.5rem;">Gagal memuat</p>`;
+      }
+    }
+
+    /* ──────────────────────────────────────────────
+       ADMIN: PENGAJUAN MANAGEMENT
+    ────────────────────────────────────────────── */
+    async function loadPengajuan() {
+      const list = document.getElementById('pengajuan-list');
+      list.innerHTML = '<div class="skeleton" style="height:60px;margin:0.5rem;"></div>'.repeat(4);
+
+      try {
+        const res = await apiCall({ action: 'getAllIzin' });
+        if (!res.success || !res.records || res.records.length === 0) {
+          list.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:0.82rem;padding:2rem;">Tidak ada pengajuan</p>';
+          document.getElementById('pengajuan-count').textContent = '0 pengajuan';
+          return;
+        }
+
+        document.getElementById('pengajuan-count').textContent = res.records.length + ' pengajuan';
+        list.innerHTML = res.records.map((r, i) => {
+          const statusBadge = r.status === 'Approved'
+            ? '<span class="badge badge-approved">Disetujui</span>'
+            : r.status === 'Rejected'
+            ? '<span class="badge badge-rejected">Ditolak</span>'
+            : '<span class="badge badge-pending">Menunggu</span>';
+          const actionBtns = r.status === 'Pending' ? `
+            <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+              <button onclick="handleIzinAction(${i}, 'Approved')" class="btn btn-sm btn-success" style="font-size:0.7rem;padding:0.3rem 0.7rem;">✓ Setujui</button>
+              <button onclick="handleIzinAction(${i}, 'Rejected')" class="btn btn-sm btn-danger" style="font-size:0.7rem;padding:0.3rem 0.7rem;">✗ Tolak</button>
+            </div>` : '';
+          return `
+            <div style="padding:0.85rem;border:1px solid var(--border-lighter);border-radius:12px;margin-bottom:0.5rem;">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <p style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin:0;">${escHtml(r.nama)} (${escHtml(r.id_karyawan)})</p>
+                  <p style="font-size:0.78rem;color:var(--text-secondary);margin:0.2rem 0;">${escHtml(r.tipe)} · ${escHtml(r.dari)} → ${escHtml(r.sampai)}</p>
+                  <p style="font-size:0.72rem;color:var(--text-muted);margin:0;">${escHtml(r.alasan)}</p>
+                </div>
+                ${statusBadge}
+              </div>
+              ${actionBtns}
+            </div>`;
+        }).join('');
+
+        // Store for action reference
+        window._pengajuanData = res.records;
+      } catch (err) {
+        list.innerHTML = `<p style="text-align:center;color:var(--text-muted);font-size:0.82rem;padding:2rem;">Gagal memuat: ${escHtml(err.message)}</p>`;
+      }
+    }
+
+    async function handleIzinAction(index, newStatus) {
+      const r = window._pengajuanData[index];
+      if (!r) return;
+      const label = newStatus === 'Approved' ? 'Setujui' : 'Tolak';
+      confirmModal(`${label} Pengajuan?`, `${r.tipe} oleh ${r.nama} (${r.dari} s/d ${r.sampai})`, async () => {
+        try {
+          const res = await apiCall({
+            action: 'updateIzinStatus',
+            id_karyawan: r.id_karyawan,
+            dari: r.dari, sampai: r.sampai,
+            new_status: newStatus
+          });
+          if (res.success) {
+            showToast(`Pengajuan ${newStatus === 'Approved' ? 'disetujui' : 'ditolak'}.`, 'success');
+            loadPengajuan();
+          } else {
+            showToast(res.message || 'Gagal.', 'error');
+          }
+        } catch (err) { showToast('Error: ' + err.message, 'error'); }
+      });
+    }
+
+
+    /* ──────────────────────────────────────────────
+       ADMIN SETUP & TABS
     ────────────────────────────────────────────── */
     function setupAdminView() {
       document.getElementById('admin-nama').textContent = currentUser.nama;
     }
 
     function switchAdminTab(tab) {
-      // Update tab buttons
-      document.getElementById('tab-btn-users').classList.toggle('active',   tab === 'users');
-      document.getElementById('tab-btn-absensi').classList.toggle('active', tab === 'absensi');
-
-      // Show/hide panels
-      document.getElementById('tab-users').style.display   = (tab === 'users')   ? 'block' : 'none';
-      document.getElementById('tab-absensi').style.display = (tab === 'absensi') ? 'block' : 'none';
+      ['users', 'absensi', 'pengajuan'].forEach(t => {
+        document.getElementById('tab-btn-' + t).classList.toggle('active', t === tab);
+        document.getElementById('tab-' + t).style.display = t === tab ? 'block' : 'none';
+      });
+      if (tab === 'pengajuan') loadPengajuan();
     }
 
     /* ──────────────────────────────────────────────
@@ -934,11 +1719,10 @@
     ────────────────────────────────────────────── */
     async function loadUsers() {
       const tbody = document.getElementById('users-tbody');
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:2rem;">Memuat…</td></tr>';
+      showSkeleton(tbody, 4);
 
       try {
         const res = await apiCall({ action: 'getUsers' });
-
         if (!res.success) {
           tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#ef4444;padding:2rem;">${escHtml(res.message)}</td></tr>`;
           return;
@@ -947,65 +1731,46 @@
         document.getElementById('users-count').textContent = res.users.length + ' karyawan terdaftar';
 
         if (res.users.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:2rem;">Belum ada data karyawan.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:2rem;">Belum ada data karyawan.</td></tr>';
           return;
         }
 
         tbody.innerHTML = res.users.map(u => {
-          const isAdmin  = u.role === 'Admin';
-          const badge    = isAdmin
-            ? '<span class="badge badge-admin">Admin</span>'
-            : '<span class="badge badge-karyawan">Karyawan</span>';
+          const isAdmin = u.role === 'Admin';
+          const badge = isAdmin ? '<span class="badge badge-admin">Admin</span>' : '<span class="badge badge-karyawan">Karyawan</span>';
           const btnLabel = isAdmin ? 'Jadikan Karyawan' : 'Jadikan Admin';
-          const newRole  = isAdmin ? 'Karyawan' : 'Admin';
-          const btnStyle = isAdmin
-            ? 'background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;'
-            : 'background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe;';
-
+          const btnClass = isAdmin ? 'btn-danger' : 'btn-primary';
           return `
             <tr>
-              <td><code style="font-size:0.82rem;background:#f8fafc;padding:0.2rem 0.45rem;border-radius:5px;border:1px solid #e2e8f0;">${escHtml(u.id_karyawan)}</code></td>
-              <td style="font-weight:500;color:#0f172a;">${escHtml(u.nama)}</td>
+              <td><code style="font-size:0.8rem;background:var(--bg-card-hover);padding:0.2rem 0.4rem;border-radius:5px;">${escHtml(u.id_karyawan)}</code></td>
+              <td style="font-weight:500;color:var(--text-primary);">${escHtml(u.nama)}</td>
               <td>${badge}</td>
-              <td>
-                <button class="btn btn-sm" style="${btnStyle}border-radius:7px;font-size:0.75rem;"
-                  onclick="toggleRole('${escHtml(u.id_karyawan)}', '${escHtml(u.role)}')">
-                  ${btnLabel}
-                </button>
-              </td>
-            </tr>
-          `;
+              <td><button class="btn btn-sm ${btnClass}" style="font-size:0.72rem;padding:0.3rem 0.6rem;" onclick="toggleRole('${escHtml(u.id_karyawan)}', '${escHtml(u.role)}')">${btnLabel}</button></td>
+            </tr>`;
         }).join('');
-
       } catch (err) {
         tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:#ef4444;padding:2rem;">${escHtml(err.message)}</td></tr>`;
       }
     }
 
-    async function toggleRole(id_karyawan, currentRole) {
+    function toggleRole(id_karyawan, currentRole) {
       const newRole = currentRole === 'Admin' ? 'Karyawan' : 'Admin';
-      const confirmed = confirm(`Ubah role "${id_karyawan}" menjadi "${newRole}"?`);
-      if (!confirmed) return;
-
-      try {
-        const res = await apiCall({ action: 'updateUserRole', id_karyawan, new_role: newRole });
-        if (res.success) {
-          showToast(res.message, 'success');
-          loadUsers(); // refresh table
-        } else {
-          showToast(res.message, 'error');
-        }
-      } catch (err) {
-        showToast('Gagal: ' + err.message, 'error');
-      }
+      confirmModal('Ubah Role?', `Ubah role "${id_karyawan}" menjadi "${newRole}"?`, async () => {
+        try {
+          const res = await apiCall({ action: 'updateUserRole', id_karyawan, new_role: newRole });
+          if (res.success) { showToast(res.message, 'success'); loadUsers(); }
+          else showToast(res.message, 'error');
+        } catch (err) { showToast('Gagal: ' + err.message, 'error'); }
+      });
     }
+
 
     /* ──────────────────────────────────────────────
        ADMIN: LOAD TODAY'S ABSENSI
     ────────────────────────────────────────────── */
     async function loadTodayAbsensi() {
       const tbody = document.getElementById('absensi-tbody');
-      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:2rem;">Memuat…</td></tr>';
+      showSkeleton(tbody, 6);
 
       try {
         const res = await apiCall({ action: 'getTodayAbsensi' });
@@ -1017,62 +1782,70 @@
         }
 
         if (!res.success) {
-          tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#ef4444;padding:2rem;">${escHtml(res.message)}</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#ef4444;padding:2rem;">${escHtml(res.message)}</td></tr>`;
           return;
         }
 
         if (res.records.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:2rem;">Belum ada absensi hari ini.</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:2rem;">Belum ada absensi hari ini.</td></tr>';
           return;
         }
 
         tbody.innerHTML = res.records.map(r => {
-          const time  = r.timestamp ? r.timestamp.substring(11, 19) : '—';
+          const time = r.timestamp ? r.timestamp.substring(11, 19) : '—';
           const isCin = r.tipe_absen === 'Check-In';
-          const badge = isCin
-            ? '<span class="badge badge-checkin">Check-In</span>'
-            : '<span class="badge badge-checkout">Check-Out</span>';
+          const badge = isCin ? '<span class="badge badge-checkin">Check-In</span>' : '<span class="badge badge-checkout">Check-Out</span>';
+
+          // Status cerdas
+          let keterangan = '';
+          if (isCin) {
+            const status = getAttendanceStatus(time, null);
+            if (status) keterangan = `<span class="badge ${status.class}">${status.label}</span>`;
+          }
+
+          // Geofence info
+          const geoBadge = r.in_radius === true
+            ? '<span class="geofence-badge geofence-in" style="font-size:0.68rem;">Di area</span>'
+            : r.in_radius === false
+            ? `<span class="geofence-badge geofence-out" style="font-size:0.68rem;">${r.distance || '?'}m</span>`
+            : '';
+
           const mapsBtn = r.link_maps
-            ? `<a href="${escHtml(r.link_maps)}" target="_blank" rel="noopener noreferrer"
-                style="display:inline-flex;align-items:center;gap:4px;color:#6366f1;font-size:0.78rem;font-weight:500;text-decoration:none;">
-                 <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                   <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
-                   <circle cx="12" cy="11" r="3"/>
-                 </svg>Maps</a>`
-            : '<span style="color:#cbd5e1;font-size:0.78rem;">—</span>';
+            ? `<a href="${escHtml(r.link_maps)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:3px;color:#6366f1;font-size:0.75rem;font-weight:500;text-decoration:none;">
+                <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/></svg>Maps</a>`
+            : '<span style="color:var(--text-muted);font-size:0.75rem;">—</span>';
 
           return `
             <tr>
-              <td style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;color:#475569;">${escHtml(time)}</td>
-              <td><code style="font-size:0.8rem;background:#f8fafc;padding:0.2rem 0.4rem;border-radius:5px;border:1px solid #e2e8f0;">${escHtml(r.id_karyawan)}</code></td>
-              <td style="font-weight:500;color:#0f172a;white-space:nowrap;">${escHtml(r.nama)}</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:0.8rem;">${escHtml(time)}</td>
+              <td><code style="font-size:0.78rem;background:var(--bg-card-hover);padding:0.15rem 0.4rem;border-radius:4px;">${escHtml(r.id_karyawan)}</code></td>
+              <td style="font-weight:500;color:var(--text-primary);white-space:nowrap;">${escHtml(r.nama)}</td>
               <td>${badge}</td>
+              <td>${keterangan} ${geoBadge}</td>
               <td>${mapsBtn}</td>
-            </tr>
-          `;
+            </tr>`;
         }).join('');
-
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#ef4444;padding:2rem;">${escHtml(err.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:#ef4444;padding:2rem;">${escHtml(err.message)}</td></tr>`;
       }
     }
+
 
     /* ──────────────────────────────────────────────
        TOAST NOTIFICATIONS
     ────────────────────────────────────────────── */
     const TOAST_ICONS = {
       success: `<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
-      error  : `<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
-      info   : `<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+      error: `<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+      info: `<svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
     };
 
-    function showToast(message, type = 'info', duration = 4000) {
+    function showToast(message, type = 'info', duration = 4500) {
       const container = document.getElementById('toast-container');
-      const toast     = document.createElement('div');
+      const toast = document.createElement('div');
       toast.className = `toast ${type}`;
       toast.innerHTML = `${TOAST_ICONS[type] || ''}<span>${escHtml(message)}</span>`;
       container.appendChild(toast);
-
       setTimeout(() => {
         toast.classList.add('leaving');
         setTimeout(() => toast.remove(), 300);
@@ -1084,12 +1857,7 @@
     ────────────────────────────────────────────── */
     function escHtml(str) {
       if (str == null) return '';
-      return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
     }
 
     /* ──────────────────────────────────────────────
@@ -1098,14 +1866,13 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         const activeView = document.querySelector('.view.active');
-        if (activeView && activeView.id === 'view-login') {
-          handleLogin();
-        }
+        if (activeView && activeView.id === 'view-login') handleLogin();
       }
+      if (e.key === 'Escape') closeModal();
     });
 
     /* ──────────────────────────────────────────────
-       INIT — restore session from localStorage
+       INIT
     ────────────────────────────────────────────── */
     (function initApp() {
       const saved = localStorage.getItem('absensi_fsr_user');
@@ -1114,20 +1881,14 @@
           currentUser = JSON.parse(saved);
           if (currentUser && currentUser.id_karyawan && currentUser.role) {
             if (currentUser.role === 'Admin') {
-              setupAdminView();
-              showView('admin');
-              loadUsers();
-              loadTodayAbsensi();
+              setupAdminView(); showView('admin'); loadUsers(); loadTodayAbsensi();
             } else {
-              setupKaryawanView();
-              showView('karyawan');
+              setupKaryawanView(); showView('karyawan');
             }
             startClock();
             return;
           }
-        } catch (e) {
-          localStorage.removeItem('absensi_fsr_user');
-        }
+        } catch (e) { localStorage.removeItem('absensi_fsr_user'); }
       }
       showView('login');
     })();
