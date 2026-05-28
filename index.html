@@ -1199,6 +1199,12 @@
     ────────────────────────────────────────────── */
     const GAS_URL = 'https://script.google.com/macros/s/AKfycbwKhRINeMTMoy4JxA6QNsCgz295GMJGUBI0LL25pp4irhQrNaIqavcnSoOd33vqwXAL/exec'; // <-- Paste your deployed GAS URL here
 
+    // (Opsional) Email admin untuk fallback "Lupa PIN" saat backend belum mendukung
+    // action `requestPinReset` atau saat MailApp di GAS belum di-authorize.
+    // Kalau diisi, tombol "Email Admin" pada modal fallback akan langsung membuka
+    // aplikasi email pengguna dengan tujuan email ini sudah terisi.
+    const ADMIN_CONTACT_EMAIL = '';
+
     // Geofencing config: set your office coordinates & radius (meters)
     const OFFICE_LAT    = -5.395024;  // Latitude kantor
     const OFFICE_LON    = 105.220446; // Longitude kantor
@@ -2506,20 +2512,39 @@
     }
 
     async function deriveDashboardStatsFallback() {
-      // Best-effort: hitung KPI dari data hari ini + users
+      // Hitung KPI + weekly chart + leaderboard dari endpoint yang umum tersedia.
+      // Kalau backend punya `getAbsensiRange`, kita pakai data sebulan untuk
+      // weekly chart & leaderboard. Kalau hanya `getTodayAbsensi`, jatuh balik
+      // ke data hari ini saja (weekly & leaderboard tetap terisi seadanya).
       const today = todayWIB();
-      const [usersRes, todayRes] = await Promise.all([
+      const todayDate = new Date(today + 'T00:00:00+07:00');
+      const monthStart =
+        `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-01`;
+
+      const [usersRes, monthRes] = await Promise.all([
         apiCall({ action: 'getUsers' }).catch(() => ({ users: [] })),
-        apiCall({ action: 'getTodayAbsensi', date: today }).catch(() => ({ records: [] }))
+        fetchAbsensiSafe(monthStart, today),
       ]);
-      const users = (usersRes.users || []).filter(u => (u.status || 'active').toLowerCase() !== 'inactive');
+
+      const users = (usersRes.users || []).filter(
+        u => (u.status || 'active').toLowerCase() !== 'inactive'
+      );
       const totalKaryawan = users.length;
-      const checkins = (todayRes.records || []).filter(r => r.tipe_absen === 'Check-In');
-      const hadirSet = new Set(checkins.map(r => r.id_karyawan));
+      const userByID = {};
+      users.forEach(u => { userByID[u.id_karyawan] = u; });
+
+      const allRecords = monthRes.records || [];
+
+      // ── Stats hari ini ──
+      const todayRecords = allRecords.filter(
+        r => (r.timestamp || '').substring(0, 10) === today
+      );
+      const todayCheckins = todayRecords.filter(r => r.tipe_absen === 'Check-In');
+      const hadirSet = new Set(todayCheckins.map(r => r.id_karyawan));
       const hadirHariIni = hadirSet.size;
 
       let telatHariIni = 0;
-      checkins.forEach(r => {
+      todayCheckins.forEach(r => {
         const t = (r.timestamp || '').substring(11, 19);
         const s = getAttendanceStatus(t, null);
         if (s && s.type === 'telat') telatHariIni++;
@@ -2527,11 +2552,69 @@
 
       const tidakHadir = Math.max(0, totalKaryawan - hadirHariIni);
 
-      return {
-        totalKaryawan, hadirHariIni, telatHariIni, tidakHadir,
-        weekly: [],          // backend should populate
-        leaderboard: []
-      };
+      // ── Weekly chart (7 hari terakhir) ──
+      const weekly = [];
+      const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(todayDate);
+        d.setDate(d.getDate() - i);
+        const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const dayRecs = allRecords.filter(r => (r.timestamp || '').substring(0, 10) === ds);
+        const dayCins = dayRecs.filter(r => r.tipe_absen === 'Check-In');
+        const daySet = new Set();
+        let dayTelat = 0;
+        dayCins.forEach(r => {
+          daySet.add(r.id_karyawan);
+          const t = (r.timestamp || '').substring(11, 19);
+          const s = getAttendanceStatus(t, null);
+          if (s && s.type === 'telat') dayTelat++;
+        });
+        const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+        const hadirCount = Math.max(0, daySet.size - dayTelat);
+        const alpaCount = isWeekend ? 0 : Math.max(0, totalKaryawan - daySet.size);
+        weekly.push({
+          date: ds,
+          label: dayNames[d.getDay()],
+          hadir: hadirCount,
+          telat: dayTelat,
+          alpa: alpaCount,
+        });
+      }
+
+      // ── Leaderboard (top 5 tepat waktu bulan berjalan) ──
+      const tepatCount = {};
+      allRecords
+        .filter(r => r.tipe_absen === 'Check-In')
+        .forEach(r => {
+          const t = (r.timestamp || '').substring(11, 19);
+          const s = getAttendanceStatus(t, null);
+          if (s && s.type === 'tepat') {
+            tepatCount[r.id_karyawan] = (tepatCount[r.id_karyawan] || 0) + 1;
+          }
+        });
+      const leaderboard = Object.entries(tepatCount)
+        .map(([id, count]) => ({
+          id_karyawan: id,
+          nama: (userByID[id] && userByID[id].nama) || id,
+          tepat_waktu: count,
+        }))
+        .sort((a, b) => b.tepat_waktu - a.tepat_waktu)
+        .slice(0, 5);
+
+      return { totalKaryawan, hadirHariIni, telatHariIni, tidakHadir, weekly, leaderboard };
+    }
+
+    // Helper: ambil absensi rentang tanggal dengan fallback ke hari ini saja
+    async function fetchAbsensiSafe(from, to) {
+      try {
+        const res = await apiCall({ action: 'getAbsensiRange', from, to });
+        if (res && Array.isArray(res.records)) return { records: res.records };
+      } catch (e) { /* try fallback */ }
+      try {
+        const res = await apiCall({ action: 'getTodayAbsensi', date: to });
+        if (res && Array.isArray(res.records)) return { records: res.records };
+      } catch (e) { /* swallow */ }
+      return { records: [] };
     }
 
     function renderKPIs(s) {
@@ -2615,7 +2698,7 @@
       const el = document.getElementById('leaderboard-list');
       if (!el) return;
       if (!list || !list.length) {
-        el.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:0.82rem;padding:1.5rem 0;">Belum ada data leaderboard.<br><small>Backend perlu support action <code>getDashboardStats</code>.</small></p>';
+        el.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:0.82rem;padding:1.5rem 0;">Belum ada absensi tepat waktu bulan ini.</p>';
         return;
       }
       const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
@@ -2656,20 +2739,65 @@
       const orig = btn.textContent;
       btn.innerHTML = '<span class="spinner"></span>&nbsp;Mengirim…';
 
+      let success = false;
+      let serverMsg = '';
       try {
         const res = await apiCall({ action: 'requestPinReset', id_karyawan: id, email });
-        if (res.success) {
-          showToast(res.message || 'Permintaan dikirim. Admin akan memproses.', 'success', 6000);
-          closeForgotPinModal();
+        if (res && res.success) {
+          success = true;
+          serverMsg = res.message || 'Permintaan dikirim. Admin akan memproses.';
         } else {
-          showToast(res.message || 'Gagal mengirim permintaan.', 'error');
+          serverMsg = (res && res.message) || 'Server tidak dapat memproses permintaan.';
         }
       } catch (err) {
-        showToast('Error: ' + err.message, 'error');
+        const isNetwork = /failed to fetch|networkerror|load failed|network request failed/i.test(err.message || '');
+        serverMsg = isNetwork
+          ? 'Tidak dapat menghubungi server. Backend mungkin belum mendukung "Lupa PIN" atau koneksi internet bermasalah.'
+          : ('Error: ' + (err.message || 'Tidak dikenal'));
       } finally {
         btn.disabled = false;
         btn.textContent = orig;
       }
+
+      if (success) {
+        showToast(serverMsg, 'success', 6000);
+        closeForgotPinModal();
+        return;
+      }
+
+      // Fallback: tampilkan opsi kontak admin manual via mailto
+      closeForgotPinModal();
+      showForgotPinFallback(id, email, serverMsg);
+    }
+
+    function showForgotPinFallback(id, email, errorMsg) {
+      const subject = `Permintaan Reset PIN Absensi FSR - ${id}`;
+      const body =
+        `Halo Admin,\n\n` +
+        `Mohon bantuan untuk reset PIN saya:\n` +
+        `- ID Karyawan : ${id}\n` +
+        `- Email       : ${email}\n\n` +
+        `Terima kasih.`;
+      const mailto =
+        `mailto:${encodeURIComponent(ADMIN_CONTACT_EMAIL || '')}` +
+        `?subject=${encodeURIComponent(subject)}` +
+        `&body=${encodeURIComponent(body)}`;
+
+      showModal({
+        icon: `<div style="width:56px;height:56px;border-radius:50%;background:rgba(245,158,11,0.12);display:inline-flex;align-items:center;justify-content:center;">
+          <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#f59e0b" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        </div>`,
+        title: 'Permintaan Tidak Terkirim',
+        message: `${errorMsg} Silakan hubungi admin langsung untuk reset PIN.`,
+        actions: [
+          { label: 'Tutup', class: 'btn-outline' },
+          {
+            label: 'Email Admin',
+            class: 'btn-primary',
+            onClick: () => { window.location.href = mailto; }
+          }
+        ]
+      });
     }
 
     /* ──────────────────────────────────────────────

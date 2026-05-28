@@ -1,0 +1,301 @@
+/**
+ * REFERENSI HANDLER GAS — copy-paste ke Apps Script Anda untuk
+ * memperbaiki dua isu:
+ *   1) "Failed to fetch" saat klik Kirim Permintaan di "Lupa PIN"
+ *      → Backend belum punya handler `requestPinReset`, atau handler-nya
+ *        crash karena `MailApp.sendEmail` belum di-authorize.
+ *   2) "Belum ada data leaderboard. Backend perlu support action getDashboardStats."
+ *      → Frontend SEKARANG sudah menghitung leaderboard sendiri sebagai
+ *        fallback, jadi handler `getDashboardStats` BERSIFAT OPSIONAL.
+ *        Disertakan di sini supaya admin yang ingin angkanya akurat
+ *        (memperhitungkan izin/cuti, dsb.) bisa override fallback.
+ *
+ * CARA PASANG:
+ *   1) Buka script Apps Script Anda (Tools → Script editor di Sheets).
+ *   2) Tambahkan/merge fungsi-fungsi di bawah ke Code.gs Anda.
+ *   3) Pastikan router `doGet` / `doPost` (atau `handleRequest`) sudah
+ *      meneruskan action `requestPinReset` & `getDashboardStats` ke
+ *      handler yang sesuai (lihat contoh `routeAction_` paling bawah).
+ *   4) Klik Run → pilih `requestPinReset` (sekali saja) → di dialog otorisasi
+ *      Google, **berikan izin Gmail/MailApp**. Tanpa langkah ini, handler
+ *      akan crash di runtime dan menghasilkan "Failed to fetch" di frontend.
+ *   5) Deploy ulang Web App (Deploy → Manage Deployments → Edit → New version).
+ *
+ * SCRIPT PROPERTIES yang dibaca:
+ *   - ADMIN_EMAIL  (wajib untuk requestPinReset; tujuan email permintaan)
+ *   - JAM_MASUK    (default "08:15")
+ *   - TOLERANSI_MENIT (default 45)
+ *
+ * Set via: File → Project properties → Script properties.
+ */
+
+
+/* ════════════════════════════════════════════════════════
+   1) requestPinReset — dipanggil dari modal "Lupa PIN"
+   ════════════════════════════════════════════════════════ */
+function requestPinReset(p) {
+  try {
+    var idKar = String(p.id_karyawan || '').trim();
+    var email = String(p.email || '').trim().toLowerCase();
+    if (!idKar || !email) {
+      return { success: false, message: 'ID Karyawan dan email wajib diisi.' };
+    }
+
+    // Verifikasi: ID & email harus cocok di sheet Users
+    var sh = SpreadsheetApp.getActive().getSheetByName('Users');
+    if (!sh) return { success: false, message: 'Sheet Users tidak ditemukan.' };
+
+    var values = sh.getDataRange().getValues();
+    var header = values[0].map(function (h) { return String(h).trim().toLowerCase(); });
+    var idxId    = header.indexOf('id_karyawan');
+    var idxNama  = header.indexOf('nama');
+    var idxEmail = header.indexOf('email');
+    if (idxId < 0 || idxEmail < 0) {
+      return { success: false, message: 'Kolom id_karyawan / email tidak ada di sheet Users.' };
+    }
+
+    var matched = null;
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i];
+      if (String(row[idxId]).trim() === idKar &&
+          String(row[idxEmail]).trim().toLowerCase() === email) {
+        matched = { nama: row[idxNama] || idKar };
+        break;
+      }
+    }
+    if (!matched) {
+      return { success: false, message: 'ID Karyawan dan email tidak cocok dengan data terdaftar.' };
+    }
+
+    // Catat permintaan ke sheet PinResetRequests (auto-create kalau belum ada)
+    var ss = SpreadsheetApp.getActive();
+    var logSh = ss.getSheetByName('PinResetRequests');
+    if (!logSh) {
+      logSh = ss.insertSheet('PinResetRequests');
+      logSh.appendRow(['timestamp', 'id_karyawan', 'nama', 'email', 'status']);
+    }
+    logSh.appendRow([new Date(), idKar, matched.nama, email, 'pending']);
+
+    // Kirim email ke admin
+    var props = PropertiesService.getScriptProperties();
+    var adminEmail = props.getProperty('ADMIN_EMAIL');
+    if (adminEmail) {
+      try {
+        MailApp.sendEmail({
+          to: adminEmail,
+          subject: 'Permintaan Reset PIN - ' + matched.nama + ' (' + idKar + ')',
+          body:
+            'Halo Admin,\n\n' +
+            'Karyawan berikut meminta reset PIN:\n' +
+            '- ID  : ' + idKar + '\n' +
+            '- Nama: ' + matched.nama + '\n' +
+            '- Email: ' + email + '\n\n' +
+            'Buka admin panel Absensi FSR untuk memprosesnya (tab Karyawan → Reset PIN).',
+        });
+      } catch (mailErr) {
+        // Permintaan tetap tercatat di sheet, tapi email gagal terkirim.
+        // Kembalikan success:true supaya UX tidak buntu — admin tetap bisa
+        // lihat di sheet PinResetRequests.
+        return {
+          success: true,
+          message:
+            'Permintaan tercatat. Catatan: email otomatis ke admin gagal terkirim ' +
+            '(' + (mailErr && mailErr.message ? mailErr.message : 'unknown') + '). ' +
+            'Admin dapat memeriksa sheet PinResetRequests secara manual.',
+        };
+      }
+    }
+
+    return {
+      success: true,
+      message: 'Permintaan dikirim. Admin akan memproses dalam 1x24 jam.',
+    };
+  } catch (e) {
+    // PENTING: jangan lempar error — selalu return JSON.
+    // Kalau lempar, GAS balas HTML → frontend dapat "Failed to fetch".
+    return { success: false, message: 'Gagal memproses: ' + (e && e.message ? e.message : e) };
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════
+   2) getDashboardStats — opsional, fallback frontend sudah ada
+   ════════════════════════════════════════════════════════ */
+function getDashboardStats() {
+  try {
+    var ss = SpreadsheetApp.getActive();
+    var usersSh   = ss.getSheetByName('Users');
+    var absensiSh = ss.getSheetByName('Absensi');
+    if (!usersSh || !absensiSh) {
+      return { success: false, message: 'Sheet Users / Absensi tidak ditemukan.' };
+    }
+
+    var props = PropertiesService.getScriptProperties();
+    var jamMasukStr = props.getProperty('JAM_MASUK') || '08:15';
+    var toleransi   = parseInt(props.getProperty('TOLERANSI_MENIT') || '45', 10);
+    var jamParts    = jamMasukStr.split(':');
+    var jamMasukMin = parseInt(jamParts[0], 10) * 60 + parseInt(jamParts[1], 10);
+    var batasTelat  = jamMasukMin + toleransi;
+
+    // Load users (filter status active)
+    var uVals = usersSh.getDataRange().getValues();
+    var uHead = uVals[0].map(function (h) { return String(h).trim().toLowerCase(); });
+    var uIdxId     = uHead.indexOf('id_karyawan');
+    var uIdxNama   = uHead.indexOf('nama');
+    var uIdxStatus = uHead.indexOf('status');
+    var users = [];
+    for (var i = 1; i < uVals.length; i++) {
+      var r = uVals[i];
+      var status = uIdxStatus >= 0 ? String(r[uIdxStatus] || 'active').toLowerCase() : 'active';
+      if (status === 'inactive') continue;
+      users.push({ id: String(r[uIdxId]), nama: r[uIdxNama] });
+    }
+    var totalKaryawan = users.length;
+    var namaById = {};
+    users.forEach(function (u) { namaById[u.id] = u.nama; });
+
+    // Load absensi (semua, lalu filter di JS)
+    var aVals = absensiSh.getDataRange().getValues();
+    var aHead = aVals[0].map(function (h) { return String(h).trim().toLowerCase(); });
+    var aIdxTs   = aHead.indexOf('timestamp');
+    var aIdxId   = aHead.indexOf('id_karyawan');
+    var aIdxTipe = aHead.indexOf('tipe_absen');
+
+    var tz = Session.getScriptTimeZone() || 'Asia/Jakarta';
+    var todayStr = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+    var monthPrefix = todayStr.substring(0, 7); // "yyyy-MM"
+
+    var dayCount = {};            // { 'yyyy-MM-dd': { hadir:Set, telat:n } }
+    var monthTepat = {};          // { id_karyawan: count }
+    var hadirHariIni = new Set(), telatHariIniSet = new Set();
+
+    for (var j = 1; j < aVals.length; j++) {
+      var rec = aVals[j];
+      var tsRaw = rec[aIdxTs];
+      var tsStr = (tsRaw instanceof Date)
+        ? Utilities.formatDate(tsRaw, tz, 'yyyy-MM-dd HH:mm:ss')
+        : String(tsRaw || '');
+      if (tsStr.length < 19) continue;
+
+      var dateStr = tsStr.substring(0, 10);
+      var hh = parseInt(tsStr.substring(11, 13), 10);
+      var mm = parseInt(tsStr.substring(14, 16), 10);
+      if (isNaN(hh) || isNaN(mm)) continue;
+      var ciMin = hh * 60 + mm;
+
+      var idK = String(rec[aIdxId] || '');
+      var tipe = String(rec[aIdxTipe] || '');
+      if (tipe !== 'Check-In') continue;
+
+      // Aggregate per hari (untuk weekly chart)
+      if (!dayCount[dateStr]) dayCount[dateStr] = { hadirSet: {}, telat: 0 };
+      dayCount[dateStr].hadirSet[idK] = true;
+      var isTelat = ciMin > batasTelat;
+      if (isTelat) dayCount[dateStr].telat++;
+
+      // Today
+      if (dateStr === todayStr) {
+        hadirHariIni.add(idK);
+        if (isTelat) telatHariIniSet.add(idK);
+      }
+      // Bulan berjalan: count tepat waktu
+      if (!isTelat && dateStr.substring(0, 7) === monthPrefix) {
+        monthTepat[idK] = (monthTepat[idK] || 0) + 1;
+      }
+    }
+
+    var hadirHariIniCount = hadirHariIni.size;
+    var telatHariIniCount = telatHariIniSet.size;
+
+    // Weekly (7 hari terakhir)
+    var weekly = [];
+    var dayNames = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+    var todayDate = new Date();
+    for (var k = 6; k >= 0; k--) {
+      var d = new Date(todayDate);
+      d.setDate(d.getDate() - k);
+      var ds = Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+      var bucket = dayCount[ds] || { hadirSet: {}, telat: 0 };
+      var hadirKeys = Object.keys(bucket.hadirSet);
+      var hadirCnt = Math.max(0, hadirKeys.length - bucket.telat);
+      var dow = d.getDay();
+      var isWeekend = (dow === 0 || dow === 6);
+      var alpa = isWeekend ? 0 : Math.max(0, totalKaryawan - hadirKeys.length);
+      weekly.push({
+        date: ds, label: dayNames[dow],
+        hadir: hadirCnt, telat: bucket.telat, alpa: alpa,
+      });
+    }
+
+    // Leaderboard top 5
+    var leaderboard = Object.keys(monthTepat)
+      .map(function (id) { return { id_karyawan: id, nama: namaById[id] || id, tepat_waktu: monthTepat[id] }; })
+      .sort(function (a, b) { return b.tepat_waktu - a.tepat_waktu; })
+      .slice(0, 5);
+
+    return {
+      success: true,
+      stats: {
+        totalKaryawan: totalKaryawan,
+        hadirHariIni: hadirHariIniCount,
+        telatHariIni: telatHariIniCount,
+        tidakHadir: Math.max(0, totalKaryawan - hadirHariIniCount),
+        weekly: weekly,
+        leaderboard: leaderboard,
+      },
+    };
+  } catch (e) {
+    return { success: false, message: 'Gagal: ' + (e && e.message ? e.message : e) };
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════
+   Contoh router untuk doGet / doPost
+   ════════════════════════════════════════════════════════ */
+function routeAction_(payload) {
+  var action = payload && payload.action;
+  switch (action) {
+    case 'requestPinReset':   return requestPinReset(payload);
+    case 'getDashboardStats': return getDashboardStats();
+    // ... action lain yang sudah Anda punya:
+    // case 'login':            return login(payload);
+    // case 'getUsers':         return getUsers();
+    // case 'submitAbsensi':    return submitAbsensi(payload);
+    // case 'getAbsensiRange':  return getAbsensiRange(payload);
+    // case 'getMyTodayStatus': return getMyTodayStatus(payload);
+    // case 'getMyMonthly':     return getMyMonthly(payload);
+    // case 'submitIzin':       return submitIzin(payload);
+    // case 'getMyIzin':        return getMyIzin(payload);
+    // case 'getPengajuan':     return getPengajuan();
+    // case 'updateIzinStatus': return updateIzinStatus(payload);
+    // case 'addUser':          return addUser(payload);
+    // case 'updateUser':       return updateUser(payload);
+    // case 'setUserStatus':    return setUserStatus(payload);
+    // case 'resetPin':         return resetPin(payload);
+    default:
+      return { success: false, message: 'Unknown action: ' + action };
+  }
+}
+
+/* Contoh doGet/doPost — sesuaikan dengan punya Anda */
+/*
+function doGet(e)  { return _respond(_handle(e)); }
+function doPost(e) { return _respond(_handle(e)); }
+
+function _handle(e) {
+  try {
+    var raw = (e.parameter && e.parameter.data) || (e.postData && e.postData.contents) || '{}';
+    var payload = JSON.parse(raw);
+    return routeAction_(payload);
+  } catch (err) {
+    return { success: false, message: 'Invalid payload: ' + err.message };
+  }
+}
+
+function _respond(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+*/

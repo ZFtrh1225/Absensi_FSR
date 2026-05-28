@@ -155,6 +155,36 @@ pesan: `"Akun Anda dinonaktifkan. Hubungi admin."`
 { "success": true, "message": "Permintaan dikirim. Admin akan memproses dalam 1x24 jam." }
 ```
 
+> 💡 **Implementasi siap-paste:** Lihat `backend/Code.gs.example` di repo ini.
+
+### ⚠ Troubleshooting "Failed to fetch" pada Lupa PIN
+
+Gejala: User klik "Kirim Permintaan" → muncul "Gagal: Failed to fetch".
+
+Root cause yang paling sering: handler `requestPinReset` di GAS men-throw
+exception (biasanya karena `MailApp.sendEmail` belum di-authorize), GAS lalu
+membalas HTML error page, dan fetch frontend gagal mem-parse response sehingga
+melapor "Failed to fetch".
+
+**Cara perbaiki:**
+
+1. Pastikan handler ada — paste fungsi `requestPinReset` dari `backend/Code.gs.example`.
+2. Authorize scope MailApp:
+   - Di editor Apps Script, klik dropdown fungsi → pilih `requestPinReset` → klik **Run**.
+   - Akan muncul dialog "Authorization required" → klik **Review permissions**.
+   - Login Google → klik **Advanced** → **Go to {project} (unsafe)** → **Allow**.
+   - Setelah diberi izin, fungsi akan exit dengan error karena dipanggil tanpa
+     payload — itu normal. Yang penting izin sudah di-grant.
+3. Set Script Property `ADMIN_EMAIL` ke email admin yang menerima notifikasi.
+4. Deploy ulang Web App: **Deploy → Manage Deployments → Edit → Version: New version → Deploy**.
+5. Pastikan deployment di-set "Execute as: Me" dan "Who has access: Anyone".
+
+Frontend sekarang sudah tahan banting: kalau `requestPinReset` gagal,
+muncul modal "Permintaan Tidak Terkirim" dengan tombol **Email Admin** yang
+membuka aplikasi email pengguna dengan template siap kirim. Kalau Anda mengisi
+constant `ADMIN_CONTACT_EMAIL` di `index.html` (di sebelah `GAS_URL`), email
+otomatis ditujukan ke admin tersebut.
+
 ---
 
 ## 8. Action: `getAbsensiRange` (untuk Tab Absensi & export)
@@ -194,6 +224,14 @@ pesan: `"Akun Anda dinonaktifkan. Hubungi admin."`
 ---
 
 ## 9. Action: `getDashboardStats`
+
+> ✅ **Status: OPSIONAL.** Frontend sekarang menghitung weekly chart & leaderboard
+> sendiri dari data `getAbsensiRange` (fallback otomatis kalau backend tidak
+> punya action ini). Implementasikan handler ini hanya jika Anda ingin angka
+> yang lebih akurat (misalnya: leaderboard yang memperhitungkan izin/cuti
+> approved, weekly chart yang skip hari libur nasional, dsb.).
+>
+> 💡 Implementasi siap-paste tersedia di `backend/Code.gs.example`.
 
 **Request:**
 ```json
