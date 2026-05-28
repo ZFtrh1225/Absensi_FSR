@@ -176,12 +176,105 @@ function saveSelfieToDrive(base64DataUrl, idKaryawan, tipe) {
       idKaryawan + '_' + tipe.replace('-', '') + '_' + nowWIB().replace(/[: ]/g, '-') + '.jpg');
     var folder = DriveApp.getFolderById(SELFIE_FOLDER_ID);
     var file = folder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return file.getUrl();
+
+    // Ambil URL DULU sebelum setSharing — supaya kalau setSharing throw
+    // (umum terjadi di akun Google Workspace yang admin batasi sharing
+    // publik), URL tetap tersimpan ke sheet. File sudah ada di Drive,
+    // admin tinggal atur sharing folder sekali (Anyone with link → Viewer)
+    // supaya thumbnail bisa muncul di tabel.
+    var fileUrl = file.getUrl();
+
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (sharingErr) {
+      console.warn('Selfie sharing gagal (URL tetap disimpan ke sheet):', sharingErr);
+    }
+
+    return fileUrl;
   } catch (err) {
     console.error('Selfie save failed:', err);
     return '';
   }
+}
+
+// ════════════════════════════════════════════════════════════
+//  BACKFILL: isi ulang Selfie_URL untuk record lama yang kosong
+//  Cara pakai: di Apps Script editor, pilih fungsi `backfillSelfieUrls`
+//  dari dropdown lalu klik Run. Akan men-scan folder Drive selfie &
+//  mencocokkan ke baris Absensi berdasarkan ID_Karyawan + Tipe + Timestamp.
+//
+//  Format nama file (yang dibuat oleh saveSelfieToDrive):
+//    {id}_{tipe}_{yyyy-MM-dd-HH-mm-ss}.jpg
+//    contoh: 10155_CheckIn_2026-05-28-15-22-46.jpg
+// ════════════════════════════════════════════════════════════
+
+function backfillSelfieUrls() {
+  if (!SELFIE_FOLDER_ID) {
+    console.error('SELFIE_FOLDER_ID belum diisi.');
+    return;
+  }
+
+  var sheet = getSheet('Absensi');
+  var data  = sheet.getDataRange().getValues();
+  if (data.length < 2) { console.log('Sheet Absensi kosong.'); return; }
+
+  // Index baris berdasarkan kunci: id|tipe|yyyy-MM-dd-HH-mm-ss
+  var rowIndex = {};
+  for (var i = 1; i < data.length; i++) {
+    var raw = data[i][0];
+    if (!raw) continue;
+    var ts = (raw instanceof Date)
+      ? Utilities.formatDate(raw, TZ, 'yyyy-MM-dd-HH-mm-ss')
+      : String(raw).replace(' ', '-').replace(/:/g, '-').substring(0, 19);
+    var id = String(data[i][1] || '').trim();
+    var tipe = String(data[i][3] || '').replace('-', ''); // "Check-In" → "CheckIn"
+    var key = id + '|' + tipe + '|' + ts;
+    rowIndex[key] = i + 1; // simpan nomor baris (1-based)
+  }
+
+  var folder = DriveApp.getFolderById(SELFIE_FOLDER_ID);
+  var files = folder.getFiles();
+  var updated = 0, skipped = 0, notMatched = 0;
+
+  while (files.hasNext()) {
+    var file = files.next();
+    var name = file.getName(); // mis. "10155_CheckIn_2026-05-28-15-22-46.jpg"
+    var m = name.match(/^(.+?)_(CheckIn|CheckOut)_(\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})\.(jpg|jpeg|png|webp)$/i);
+    if (!m) { skipped++; continue; }
+
+    var id = m[1], tipe = m[2], ts = m[3];
+    // Coba match exact dulu; kalau gagal, toleransi ±2 detik (timestamp
+    // di sheet dibuat sedetik setelah file di-create).
+    var rowNum = rowIndex[id + '|' + tipe + '|' + ts] || 0;
+    if (!rowNum) {
+      var p = ts.split('-'); // [Y,M,D,H,m,s]
+      var base = new Date(p[0], +p[1]-1, +p[2], +p[3], +p[4], +p[5]);
+      for (var dt = -2; dt <= 2 && !rowNum; dt++) {
+        if (dt === 0) continue;
+        var d2 = new Date(base.getTime() + dt * 1000);
+        var ts2 = Utilities.formatDate(d2, TZ, 'yyyy-MM-dd-HH-mm-ss');
+        rowNum = rowIndex[id + '|' + tipe + '|' + ts2] || 0;
+      }
+    }
+
+    if (!rowNum) { notMatched++; continue; }
+
+    // Skip kalau cell Selfie_URL sudah terisi.
+    var existing = String(sheet.getRange(rowNum, 8).getValue() || '').trim();
+    if (existing) { skipped++; continue; }
+
+    var url = file.getUrl();
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (e) { /* abaikan, URL tetap diisi */ }
+
+    sheet.getRange(rowNum, 8).setValue(url);
+    updated++;
+  }
+
+  console.log('Backfill selesai: ' + updated + ' record diisi, ' + skipped +
+    ' di-skip (sudah ada / format file tidak dikenal), ' + notMatched + ' tidak match.');
+  return { updated: updated, skipped: skipped, notMatched: notMatched };
 }
 
 // ── Helper: case+format insensitive header detection untuk sheet Users ──
