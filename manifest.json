@@ -5,10 +5,13 @@
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
   "lang": "id",
+  "dir": "ltr",
+  "prefer_related_applications": false,
   "categories": ["business", "productivity"],
   "icons": [
     {
