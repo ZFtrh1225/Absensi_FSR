@@ -1097,6 +1097,10 @@
             <p id="absensi-date-label" style="color:var(--text-muted);font-size:0.78rem;margin:0.1rem 0 0;"></p>
           </div>
           <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <button onclick="loadLaporanBulanIni()" class="btn btn-sm btn-primary" style="font-size:0.78rem;">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              Laporan Bulan Ini
+            </button>
             <button onclick="loadAbsensiRange()" class="btn btn-sm btn-outline" style="font-size:0.78rem;">
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
               Refresh
@@ -2032,17 +2036,26 @@
           return;
         }
 
-        _allUsers = (res.users || []).map(u => ({
-          id_karyawan : pickField(u, ['id_karyawan', 'ID Karyawan', 'id', 'ID']),
-          nama        : pickField(u, ['nama', 'Nama', 'name']),
-          email       : pickField(u, ['email', 'Email']),
-          no_hp       : pickField(u, ['no_hp', 'No HP', 'No. HP', 'noHp', 'phone', 'Telepon']),
-          jabatan     : pickField(u, ['jabatan', 'Jabatan', 'JABATAN', 'position', 'Position']),
+        const rawUsers = res.users || [];
+
+        // One-time debug: print raw key list dari user pertama supaya mudah lihat
+        // kalau backend mengembalikan field dengan nama tak terduga.
+        if (rawUsers.length > 0) {
+          try { console.info('[Absensi FSR] getUsers response keys:', Object.keys(rawUsers[0])); }
+          catch (_) {}
+        }
+
+        _allUsers = rawUsers.map(u => ({
+          id_karyawan : pickField(u, ['id_karyawan', 'idKaryawan', 'id']),
+          nama        : pickField(u, ['nama', 'name', 'full_name', 'fullName', 'nama lengkap']),
+          email       : pickField(u, ['email', 'mail', 'e-mail']),
+          no_hp       : pickField(u, ['no_hp', 'noHp', 'phone', 'telepon', 'no telp', 'no telepon', 'whatsapp', 'wa']),
+          jabatan     : pickField(u, ['jabatan', 'position', 'posisi', 'role_jabatan', 'job_title', 'jobTitle']),
           tanggal_masuk: normalizeDateInput(
-            pickField(u, ['tanggal_masuk', 'Tanggal Masuk', 'tanggalMasuk', 'TanggalMasuk', 'tgl_masuk', 'tgl masuk', 'join_date', 'JoinDate'])
+            pickField(u, ['tanggal_masuk', 'tanggalMasuk', 'tgl_masuk', 'tglMasuk', 'tanggal masuk', 'tgl masuk', 'join_date', 'joinDate', 'mulai_kerja', 'mulai kerja'])
           ),
-          role        : pickField(u, ['role', 'Role']) || 'Karyawan',
-          status      : (pickField(u, ['status', 'Status']) || 'active').toLowerCase(),
+          role        : pickField(u, ['role', 'role_user', 'roleUser', 'tipe_user', 'tipeUser', 'akses']) || 'Karyawan',
+          status      : (pickField(u, ['status', 'aktif', 'active']) || 'active').toLowerCase(),
         }));
 
         _usersPage = 1;
@@ -2052,13 +2065,27 @@
       }
     }
 
-    // Helper: ambil nilai field dari berbagai variasi nama key
-    // (backend bisa mengembalikan 'jabatan', 'Jabatan', atau 'JABATAN', dst.)
+    // Helper: ambil nilai field dari berbagai variasi nama key.
+    // Match dilakukan dua tahap:
+    //   1) Direct match: obj[key] persis sama
+    //   2) Normalized match: lowercase + buang spasi/underscore/dash, lalu samakan
+    // Sehingga "jabatan", "Jabatan", "JABATAN", "Ja_Batan", "Ja Batan" semua bisa match.
     function pickField(obj, keys) {
       if (!obj) return '';
+      // Tahap 1: direct match
       for (let i = 0; i < keys.length; i++) {
         const v = obj[keys[i]];
         if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+      }
+      // Tahap 2: normalized match (case + format insensitive)
+      const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+      const targets = keys.map(norm);
+      const objKeys = Object.keys(obj);
+      for (let i = 0; i < objKeys.length; i++) {
+        if (targets.includes(norm(objKeys[i]))) {
+          const v = obj[objKeys[i]];
+          if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+        }
       }
       return '';
     }
@@ -2237,7 +2264,7 @@
           closeUserModal();
           loadUsers();
         } else {
-          showToast(res.message || 'Gagal menyimpan.', 'error');
+          showBackendError(res.message, 'Gagal menyimpan.', action);
         }
       } catch (err) {
         showToast('Error: ' + err.message, 'error');
@@ -2261,7 +2288,7 @@
             status: willDeactivate ? 'inactive' : 'active'
           });
           if (res.success) { showToast(res.message || 'Status diperbarui.', 'success'); loadUsers(); }
-          else showToast(res.message || 'Gagal.', 'error');
+          else showBackendError(res.message, 'Gagal mengubah status.', 'setUserStatus');
         } catch (err) { showToast('Error: ' + err.message, 'error'); }
       });
     }
@@ -2279,11 +2306,36 @@
               const newPin = res.new_pin ? ` PIN baru: ${res.new_pin}` : '';
               showToast((res.message || 'PIN berhasil direset.') + newPin, 'success', 7000);
             } else {
-              showToast(res.message || 'Gagal reset PIN.', 'error');
+              showBackendError(res.message, 'Gagal reset PIN.', 'resetPin');
             }
           } catch (err) { showToast('Error: ' + err.message, 'error'); }
         }
       );
+    }
+
+    // Helper: tampilkan error dari backend.
+    // Kalau errornya "Action tidak dikenali", munculkan modal panduan sekali per
+    // sesi supaya admin tahu langkah konkret untuk update Code.gs di GAS.
+    function showBackendError(rawMsg, fallback, action) {
+      const msg = rawMsg || fallback || 'Operasi gagal.';
+      const isUnknownAction = /tidak dikenal|tidak dikenali|unknown action|action.*tidak dikenal/i.test(msg);
+      if (!isUnknownAction) {
+        showToast(msg, 'error');
+        return;
+      }
+      // Toast ringkas + modal panduan (sekali per sesi per action)
+      showToast(`Backend GAS belum mendukung action "${action}". Update Code.gs dulu.`, 'error', 6000);
+      const seenKey = '_seen_action_guidance_' + action;
+      if (window[seenKey]) return;
+      window[seenKey] = true;
+      showModal({
+        icon: `<div style="width:56px;height:56px;border-radius:50%;background:rgba(245,158,11,0.12);display:inline-flex;align-items:center;justify-content:center;">
+          <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#f59e0b" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+        </div>`,
+        title: 'Backend Belum Diperbarui',
+        message: `Action "${action}" belum ada di Apps Script (Code.gs). Buka file backend/Code.gs.example di repo, copy isinya, paste ke Code.gs di Apps Script, klik Run sekali untuk Authorize, lalu Deploy → Manage Deployments → Edit → New version → Deploy.`,
+        actions: [{ label: 'Mengerti', class: 'btn-primary' }]
+      });
     }
 
     // Backwards-compat: keep toggleRole used by older paths
@@ -2378,6 +2430,18 @@
 
     // Keep for backward compatibility (older inline calls)
     function loadTodayAbsensi() { loadAbsensiRange(); }
+
+    // Set rentang tanggal ke awal bulan berjalan → hari ini, lalu muat data.
+    // (View-only — tidak melakukan export, hanya memudahkan admin lihat
+    // laporan bulan berjalan tanpa harus klik kalender manual.)
+    async function loadLaporanBulanIni() {
+      const today = todayWIB();              // YYYY-MM-DD WIB
+      const first = today.substring(0, 8) + '01';
+      document.getElementById('absensi-from').value = first;
+      document.getElementById('absensi-to').value   = today;
+      showToast('Memuat laporan bulan ini…', 'info', 1500);
+      await loadAbsensiRange();
+    }
 
     function getFilteredAbsensi() {
       const search = (document.getElementById('absensi-search')?.value || '').toLowerCase().trim();

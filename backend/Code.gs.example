@@ -218,6 +218,56 @@ function resetPin(p) {
 
 
 /* ════════════════════════════════════════════════════════
+   5) getUsers — kembalikan daftar karyawan dengan key yang konsisten
+
+   Frontend membaca field dengan nama lowercase: id_karyawan, nama, email,
+   no_hp, jabatan, tanggal_masuk, role, status. Pastikan handler ini
+   mengembalikan SEMUA field tersebut walau header sheet pakai huruf besar
+   atau ada spasi. Helper _readUsersSheet_ sudah handle case-insensitive.
+   ════════════════════════════════════════════════════════ */
+function getUsers() {
+  try {
+    var sh = SpreadsheetApp.getActive().getSheetByName('Users');
+    if (!sh) return { success: false, message: 'Sheet Users tidak ditemukan.' };
+
+    var ctx = _readUsersSheet_(sh);
+    var tz  = Session.getScriptTimeZone() || 'Asia/Jakarta';
+
+    var users = [];
+    for (var i = 1; i < ctx.values.length; i++) {
+      var row = ctx.values[i];
+      var idK = row[ctx.idx.id_karyawan];
+      if (!idK) continue;
+
+      // Tanggal_masuk: kalau cell-nya Date object, format ke YYYY-MM-DD;
+      // kalau sudah string, biarkan apa adanya (frontend juga toleran).
+      var tglRaw = ctx.idx.tanggal_masuk >= 0 ? row[ctx.idx.tanggal_masuk] : '';
+      var tglStr = '';
+      if (tglRaw instanceof Date) {
+        tglStr = Utilities.formatDate(tglRaw, tz, 'yyyy-MM-dd');
+      } else if (tglRaw) {
+        tglStr = String(tglRaw);
+      }
+
+      users.push({
+        id_karyawan   : String(idK),
+        nama          : String(row[ctx.idx.nama] || ''),
+        email         : ctx.idx.email   >= 0 ? String(row[ctx.idx.email]   || '') : '',
+        no_hp         : ctx.idx.no_hp   >= 0 ? String(row[ctx.idx.no_hp]   || '') : '',
+        jabatan       : ctx.idx.jabatan >= 0 ? String(row[ctx.idx.jabatan] || '') : '',
+        tanggal_masuk : tglStr,
+        role          : ctx.idx.role    >= 0 ? String(row[ctx.idx.role]    || 'Karyawan') : 'Karyawan',
+        status        : ctx.idx.status  >= 0 ? String(row[ctx.idx.status]  || 'active').toLowerCase() : 'active',
+      });
+    }
+    return { success: true, users: users };
+  } catch (e) {
+    return { success: false, message: 'Gagal: ' + (e && e.message ? e.message : e) };
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════
    Helper sheet Users — pakai header lowercase secara konsisten
    ════════════════════════════════════════════════════════ */
 function _readUsersSheet_(sh) {
@@ -384,10 +434,10 @@ function routeAction_(payload) {
     case 'updateUser':        return updateUser(payload);
     case 'setUserStatus':     return setUserStatus(payload);
     case 'resetPin':          return resetPin(payload);
+    case 'getUsers':          return getUsers();
     case 'getDashboardStats': return getDashboardStats();
     // ... action lain yang sudah Anda punya:
     // case 'login':            return login(payload);
-    // case 'getUsers':         return getUsers();
     // case 'submitAbsensi':    return submitAbsensi(payload);
     // case 'getAbsensiRange':  return getAbsensiRange(payload);
     // case 'getMyTodayStatus': return getMyTodayStatus(payload);
