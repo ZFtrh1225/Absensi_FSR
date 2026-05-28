@@ -1343,6 +1343,10 @@
         const res = await apiCall({ action: 'login', id_karyawan: id, pin: pin });
         if (res.success) {
           currentUser = res.user;
+          // Normalisasi role agar pengecekan tidak case-sensitive / whitespace-sensitive.
+          // Backend kadang return "admin" / "ADMIN" / " Admin " dari sheet.
+          currentUser.role = String(currentUser.role || '').trim().toLowerCase() === 'admin'
+            ? 'Admin' : 'Karyawan';
           localStorage.setItem('absensi_fsr_user', JSON.stringify(currentUser));
           pinInput.value = '';
           if (currentUser.role === 'Admin') {
@@ -2946,6 +2950,9 @@
         try {
           currentUser = JSON.parse(saved);
           if (currentUser && currentUser.id_karyawan && currentUser.role) {
+            // Normalisasi role agar pengecekan tahan terhadap perbedaan case / whitespace.
+            currentUser.role = String(currentUser.role || '').trim().toLowerCase() === 'admin'
+              ? 'Admin' : 'Karyawan';
             if (currentUser.role === 'Admin') {
               setupAdminView(); showView('admin'); loadDashboard();
             } else {
