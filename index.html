@@ -2333,7 +2333,7 @@
           <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#f59e0b" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
         </div>`,
         title: 'Backend Belum Diperbarui',
-        message: `Action "${action}" belum ada di Apps Script (Code.gs). Buka file backend/Code.gs.example di repo, copy isinya, paste ke Code.gs di Apps Script, klik Run sekali untuk Authorize, lalu Deploy → Manage Deployments → Edit → New version → Deploy.`,
+        message: `Action "${action}" belum ada di Apps Script. Buka backend/Code.gs.example, copy seluruh isinya, GANTI seluruh Code.gs Anda dengan itu, lalu Deploy → Manage Deployments → New version. Jangan merge manual—router-nya pasti terlewat.`,
         actions: [{ label: 'Mengerti', class: 'btn-primary' }]
       });
     }
