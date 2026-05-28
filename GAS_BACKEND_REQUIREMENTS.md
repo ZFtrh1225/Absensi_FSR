@@ -141,24 +141,45 @@ Action tidak dikenali: "setUserStatus"
 Action tidak dikenali: "resetPin"
 ```
 
-Artinya: GAS Anda menerima request, tapi router `doGet/doPost` tidak punya
-case untuk action tersebut, sehingga balasan default "Action tidak dikenali"
-yang Anda kirim balik (atau equivalent) keluar.
+Artinya: router `handleRequest` (atau `doGet/doPost`) di Code.gs Anda tidak
+punya cabang `case` untuk action tersebut, sehingga jatuh ke `default:` →
+"Action tidak dikenali". Penyebab paling umum: handler-handler baru di-paste
+sebagai _stand-alone function_ di akhir file, tapi switch statement di router
+tidak ikut di-update. Walau fungsinya ada, router tidak akan memanggilnya.
 
-**Cara perbaiki:**
+**Cara perbaiki — PALING MUDAH (Drop-in Replace):**
 
-1. Buka script Apps Script (Tools → Script editor di Sheets).
-2. Buka file `backend/Code.gs.example` di repo ini → copy seluruh isinya.
-3. Paste / merge ke `Code.gs` Anda. Pastikan:
-   - Fungsi `addUser`, `updateUser`, `setUserStatus`, `resetPin` ada.
-   - Router `routeAction_` (atau equivalent di backend Anda) meneruskan
-     keempat action tersebut ke handler yang sesuai.
-4. **Authorize Spreadsheet**: klik dropdown fungsi → pilih `addUser` → **Run**.
+1. Buka Apps Script editor (Extensions → Apps Script di Spreadsheet).
+2. Buka file `backend/Code.gs.example` di repo ini.
+3. **Copy SELURUH isinya**.
+4. **Hapus SELURUH isi `Code.gs` Anda** lalu paste isi yang baru.
+5. Update `SPREADSHEET_ID` dan `SELFIE_FOLDER_ID` di section CONFIG sesuai
+   nilai yang Anda pakai sebelumnya.
+6. **Authorize**: dropdown fungsi → pilih `handleAddUser` → klik **Run**.
    Dialog "Authorization required" → **Review permissions** → **Advanced** →
-   **Go to {project} (unsafe)** → **Allow**. Untuk `resetPin` ulangi dengan
-   memilih `resetPin` (perlu izin `MailApp` tambahan).
-5. **Deploy ulang Web App**: Deploy → Manage Deployments → Edit → Version:
-   **New version** → Deploy. Pastikan "Execute as: Me", "Who has access: Anyone".
+   **Go to {project} (unsafe)** → **Allow**. Ulangi untuk `handleResetPin`
+   (perlu izin `MailApp` tambahan).
+7. **Deploy ulang Web App**: Deploy → Manage Deployments → Edit (ikon pensil)
+   → Version: **New version** → Deploy. Pastikan "Execute as: Me",
+   "Who has access: Anyone".
+
+> ⚠ **Jangan paste partial / merge manual.** Pengalaman menunjukkan banyak
+> orang lupa update switch statement di `handleRequest`, sehingga handler
+> baru tidak pernah dipanggil walau fungsinya sudah ada di file. Drop-in
+> replace lebih aman dan menjamin router ikut di-update.
+
+**Apa yang sudah otomatis di-handle oleh `Code.gs.example` v3.0.0:**
+
+- ✅ Switch statement di `handleRequest` punya case untuk semua action baru:
+  `addUser`, `updateUser`, `setUserStatus`, `resetPin`, `getAbsensiRange`.
+- ✅ Auto-add kolom `Email`, `No_HP`, `Jabatan`, `Tanggal_Masuk`, `Status` ke
+  sheet `Users` saat addUser/updateUser pertama kali (kalau belum ada).
+- ✅ `handleGetUsers` return semua field termasuk `jabatan`, `tanggal_masuk`
+  (sebelumnya hanya return id/nama/role → makanya Jabatan kosong di tabel admin).
+- ✅ `handleLogin` reject user dengan `status='inactive'` (soft-delete benar
+  mengunci akun).
+- ✅ Header sheet matched case+format insensitive — "ID_Karyawan" sama dengan
+  "id_karyawan" sama dengan "ID Karyawan".
 
 Setelah langkah ini, semua action di tab Karyawan akan jalan.
 
