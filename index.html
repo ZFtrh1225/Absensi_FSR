@@ -2615,17 +2615,31 @@
       // antar sheet (misal: "10155" vs "10155 " vs "P10155").
       const allUserByID = {};
       const allUserByIDLower = {};
+      const allUserByPIN = {};      // jaga-jaga kalau Absensi.id_karyawan ternyata berisi PIN
+      const allUserByNamaLower = {}; // fallback terakhir lookup via nama
       allUsers.forEach(u => {
         const key = String(u.id_karyawan || '').trim();
         if (key) {
           allUserByID[key] = u;
           allUserByIDLower[key.toLowerCase()] = u;
         }
+        const pin = String(u.pin || '').trim();
+        if (pin) allUserByPIN[pin] = u;
+        const nm = String(u.nama || '').trim().toLowerCase();
+        if (nm) allUserByNamaLower[nm] = u;
       });
       const findUserByID = (rawId) => {
         const k = String(rawId || '').trim();
         if (!k) return null;
-        return allUserByID[k] || allUserByIDLower[k.toLowerCase()] || null;
+        return allUserByID[k]
+          || allUserByIDLower[k.toLowerCase()]
+          || allUserByPIN[k]              // ← absensi mungkin menyimpan PIN sebagai id_karyawan
+          || null;
+      };
+      const findUserByNama = (rawNama) => {
+        const k = String(rawNama || '').trim().toLowerCase();
+        if (!k) return null;
+        return allUserByNamaLower[k] || null;
       };
 
       // Helper: record di-exclude HANYA kalau match dengan user admin/inactive.
@@ -2691,6 +2705,10 @@
       }
 
       // ── Leaderboard (top 3 tepat waktu bulan berjalan, exclude admin) ──
+      // tepatCount[id] = { count, nama }
+      // Kita simpan nama dari record absensi (kolom Nama disimpan saat
+      // check-in) supaya bisa langsung ditampilkan tanpa bergantung pada
+      // lookup ke sheet Users yang struktur kolomnya bisa bervariasi.
       const tepatCount = {};
       allRecords
         .filter(r => r.tipe_absen === 'Check-In' && !isExcludedRecord(r))
@@ -2699,18 +2717,36 @@
           const s = getAttendanceStatus(t, null);
           if (s && s.type === 'tepat') {
             const key = String(r.id_karyawan || '').trim();
-            if (key) tepatCount[key] = (tepatCount[key] || 0) + 1;
+            if (!key) return;
+            if (!tepatCount[key]) {
+              tepatCount[key] = { count: 0, nama: String(r.nama || '').trim() };
+            }
+            tepatCount[key].count += 1;
+            // Update nama kalau record sebelumnya kosong
+            if (!tepatCount[key].nama && r.nama) {
+              tepatCount[key].nama = String(r.nama).trim();
+            }
           }
         });
       const leaderboard = Object.entries(tepatCount)
-        .map(([id, count]) => {
-          // Lookup nama+jabatan dari semua user (case-insensitive fallback).
-          const u = findUserByID(id) || {};
+        .map(([id, data]) => {
+          // Strategi multi-lookup untuk dapat jabatan:
+          //   1) by id_karyawan / case-insensitive / by PIN  (handle kasus
+          //      sheet Users yang kolom pertamanya adalah PIN, sehingga
+          //      backend menyimpan PIN sebagai id_karyawan di Absensi).
+          //   2) by Nama (fallback terakhir — nama di Absensi disimpan saat
+          //      check-in, sehingga reliable).
+          const u = findUserByID(id) || findUserByNama(data.nama) || {};
+          // Nama: prioritaskan nama dari record absensi (asli saat check-in),
+          // baru fallback ke nama dari sheet Users, baru fallback ke id mentah.
+          const namaFinal = (data.nama && String(data.nama).trim())
+            || u.nama
+            || id;
           return {
             id_karyawan: id,
-            nama: u.nama || id,
+            nama: namaFinal,
             jabatan: u.jabatan || '',
-            tepat_waktu: count,
+            tepat_waktu: data.count,
           };
         })
         .sort((a, b) => b.tepat_waktu - a.tepat_waktu)
