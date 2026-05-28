@@ -270,7 +270,10 @@ function handleLogin(params) {
       user: {
         id_karyawan : rowId,
         nama        : ctx.idx.nama >= 0 ? str(row[ctx.idx.nama]) : str(row[1]),
-        role        : ctx.idx.role >= 0 ? str(row[ctx.idx.role]) : str(row[3]),
+        role        : (function () {
+          var raw = ctx.idx.role >= 0 ? str(row[ctx.idx.role]) : str(row[3]);
+          return raw.toLowerCase() === 'admin' ? 'Admin' : 'Karyawan';
+        })(),
       },
     };
   }
