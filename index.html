@@ -2124,8 +2124,12 @@
         return true;
       });
 
-      document.getElementById('users-count').textContent =
-        `${filtered.length} dari ${_allUsers.length} karyawan`;
+      // Hitung jumlah karyawan vs admin terpisah supaya admin tahu komposisi user.
+      const totalKaryawanRole = _allUsers.filter(u => String(u.role || 'Karyawan').toLowerCase() !== 'admin').length;
+      const totalAdminRole    = _allUsers.length - totalKaryawanRole;
+      document.getElementById('users-count').textContent = totalAdminRole > 0
+        ? `${filtered.length} ditampilkan · ${totalKaryawanRole} karyawan · ${totalAdminRole} admin`
+        : `${filtered.length} dari ${_allUsers.length} karyawan`;
 
       // Pagination
       const total = filtered.length;
@@ -2563,6 +2567,10 @@
       // Kalau backend punya `getAbsensiRange`, kita pakai data sebulan untuk
       // weekly chart & leaderboard. Kalau hanya `getTodayAbsensi`, jatuh balik
       // ke data hari ini saja (weekly & leaderboard tetap terisi seadanya).
+      //
+      // ⚠ Admin DI-EXCLUDE dari semua statistik (totalKaryawan, hadirHariIni,
+      // tidakHadir, weekly chart, leaderboard). Admin tetap bisa login &
+      // mengelola karyawan, tapi tidak dihitung sebagai karyawan.
       const today = todayWIB();
       const todayDate = new Date(today + 'T00:00:00+07:00');
       const monthStart =
@@ -2573,21 +2581,34 @@
         fetchAbsensiSafe(monthStart, today),
       ]);
 
-      const users = (usersRes.users || []).filter(
-        u => (u.status || 'active').toLowerCase() !== 'inactive'
-      );
-      const totalKaryawan = users.length;
-      const userByID = {};
-      users.forEach(u => { userByID[u.id_karyawan] = u; });
+      // Filter: hanya karyawan aktif (exclude admin & inactive) untuk perhitungan stats.
+      const allUsers = usersRes.users || [];
+      const karyawanUsers = allUsers.filter(u => {
+        const status = String(u.status || 'active').toLowerCase();
+        const role   = String(u.role || 'Karyawan').toLowerCase();
+        return status !== 'inactive' && role !== 'admin';
+      });
+      const totalKaryawan = karyawanUsers.length;
+
+      // Lookup karyawan by ID — defensive trim/string cast supaya match berbagai
+      // format (number / string / dengan whitespace).
+      const karyawanByID = {};
+      karyawanUsers.forEach(u => {
+        const key = String(u.id_karyawan || '').trim();
+        if (key) karyawanByID[key] = u;
+      });
+
+      // Helper: cek apakah record absensi milik karyawan (bukan admin).
+      const isKaryawanRecord = (r) => !!karyawanByID[String(r.id_karyawan || '').trim()];
 
       const allRecords = monthRes.records || [];
 
-      // ── Stats hari ini ──
+      // ── Stats hari ini (exclude admin) ──
       const todayRecords = allRecords.filter(
         r => (r.timestamp || '').substring(0, 10) === today
       );
-      const todayCheckins = todayRecords.filter(r => r.tipe_absen === 'Check-In');
-      const hadirSet = new Set(todayCheckins.map(r => r.id_karyawan));
+      const todayCheckins = todayRecords.filter(r => r.tipe_absen === 'Check-In' && isKaryawanRecord(r));
+      const hadirSet = new Set(todayCheckins.map(r => String(r.id_karyawan).trim()));
       const hadirHariIni = hadirSet.size;
 
       let telatHariIni = 0;
@@ -2599,7 +2620,7 @@
 
       const tidakHadir = Math.max(0, totalKaryawan - hadirHariIni);
 
-      // ── Weekly chart (7 hari terakhir) ──
+      // ── Weekly chart (7 hari terakhir, exclude admin) ──
       const weekly = [];
       const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
       for (let i = 6; i >= 0; i--) {
@@ -2607,11 +2628,11 @@
         d.setDate(d.getDate() - i);
         const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         const dayRecs = allRecords.filter(r => (r.timestamp || '').substring(0, 10) === ds);
-        const dayCins = dayRecs.filter(r => r.tipe_absen === 'Check-In');
+        const dayCins = dayRecs.filter(r => r.tipe_absen === 'Check-In' && isKaryawanRecord(r));
         const daySet = new Set();
         let dayTelat = 0;
         dayCins.forEach(r => {
-          daySet.add(r.id_karyawan);
+          daySet.add(String(r.id_karyawan).trim());
           const t = (r.timestamp || '').substring(11, 19);
           const s = getAttendanceStatus(t, null);
           if (s && s.type === 'telat') dayTelat++;
@@ -2628,23 +2649,28 @@
         });
       }
 
-      // ── Leaderboard (top 5 tepat waktu bulan berjalan) ──
+      // ── Leaderboard (top 5 tepat waktu bulan berjalan, exclude admin) ──
       const tepatCount = {};
       allRecords
-        .filter(r => r.tipe_absen === 'Check-In')
+        .filter(r => r.tipe_absen === 'Check-In' && isKaryawanRecord(r))
         .forEach(r => {
           const t = (r.timestamp || '').substring(11, 19);
           const s = getAttendanceStatus(t, null);
           if (s && s.type === 'tepat') {
-            tepatCount[r.id_karyawan] = (tepatCount[r.id_karyawan] || 0) + 1;
+            const key = String(r.id_karyawan).trim();
+            tepatCount[key] = (tepatCount[key] || 0) + 1;
           }
         });
       const leaderboard = Object.entries(tepatCount)
-        .map(([id, count]) => ({
-          id_karyawan: id,
-          nama: (userByID[id] && userByID[id].nama) || id,
-          tepat_waktu: count,
-        }))
+        .map(([id, count]) => {
+          const u = karyawanByID[id] || {};
+          return {
+            id_karyawan: id,
+            nama: u.nama || id,
+            jabatan: u.jabatan || '',
+            tepat_waktu: count,
+          };
+        })
         .sort((a, b) => b.tepat_waktu - a.tepat_waktu)
         .slice(0, 5);
 
@@ -2754,7 +2780,7 @@
           <span style="font-size:1.15rem;width:26px;text-align:center;">${medals[i] || (i+1)}</span>
           <div style="flex:1;min-width:0;">
             <p style="font-size:0.85rem;font-weight:600;color:var(--text-primary);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(p.nama || p.id_karyawan)}</p>
-            <p style="font-size:0.7rem;color:var(--text-muted);margin:0;">${escHtml(p.id_karyawan || '')}</p>
+            <p style="font-size:0.7rem;color:var(--text-muted);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(p.jabatan || '—')}</p>
           </div>
           <div style="text-align:right;">
             <p style="font-size:0.95rem;font-weight:700;color:#10b981;margin:0;">${p.tepat_waktu ?? p.score ?? 0}</p>
