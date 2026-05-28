@@ -1036,7 +1036,7 @@
 
         <!-- Leaderboard -->
         <div class="card" style="padding:1.25rem;">
-          <h3 style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);margin:0 0 0.75rem;">5 Karyawan Paling Rajin Bulan Ini</h3>
+          <h3 style="font-size:0.9375rem;font-weight:700;color:var(--text-primary);margin:0 0 0.75rem;">3 Karyawan Paling Rajin Bulan Ini</h3>
           <p style="color:var(--text-muted);font-size:0.72rem;margin:0 0 0.75rem;">Berdasarkan jumlah kehadiran tepat waktu</p>
           <div id="leaderboard-list" style="display:flex;flex-direction:column;gap:0.5rem;">
             <div class="skeleton" style="height:48px;"></div>
@@ -2669,7 +2669,7 @@
         });
       }
 
-      // ── Leaderboard (top 5 tepat waktu bulan berjalan, exclude admin) ──
+      // ── Leaderboard (top 3 tepat waktu bulan berjalan, exclude admin) ──
       const tepatCount = {};
       allRecords
         .filter(r => r.tipe_absen === 'Check-In' && !isExcludedRecord(r))
@@ -2693,7 +2693,7 @@
           };
         })
         .sort((a, b) => b.tepat_waktu - a.tepat_waktu)
-        .slice(0, 5);
+        .slice(0, 3);
 
       return { totalKaryawan, hadirHariIni, telatHariIni, tidakHadir, weekly, leaderboard };
     }
@@ -2795,17 +2795,13 @@
         el.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:0.82rem;padding:1.5rem 0;">Belum ada absensi tepat waktu bulan ini.</p>';
         return;
       }
-      const medals = ['🥇','🥈','🥉','4️⃣','5️⃣'];
-      el.innerHTML = list.slice(0, 5).map((p, i) => `
+      const medals = ['🥇','🥈','🥉'];
+      el.innerHTML = list.slice(0, 3).map((p, i) => `
         <div style="display:flex;align-items:center;gap:0.75rem;padding:0.55rem 0.75rem;border-radius:10px;background:var(--bg-card-hover);">
-          <span style="font-size:1.15rem;width:26px;text-align:center;">${medals[i] || (i+1)}</span>
+          <span style="font-size:1.25rem;width:28px;text-align:center;">${medals[i] || (i+1)}</span>
           <div style="flex:1;min-width:0;">
-            <p style="font-size:0.85rem;font-weight:600;color:var(--text-primary);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(p.nama || p.id_karyawan)}</p>
-            <p style="font-size:0.7rem;color:var(--text-muted);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(p.jabatan || '—')}</p>
-          </div>
-          <div style="text-align:right;">
-            <p style="font-size:0.95rem;font-weight:700;color:#10b981;margin:0;">${p.tepat_waktu ?? p.score ?? 0}</p>
-            <p style="font-size:0.65rem;color:var(--text-muted);margin:0;">tepat</p>
+            <p style="font-size:0.9rem;font-weight:600;color:var(--text-primary);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(p.nama || p.id_karyawan)}</p>
+            <p style="font-size:0.72rem;color:var(--text-muted);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(p.jabatan || '—')}</p>
           </div>
         </div>
       `).join('');
