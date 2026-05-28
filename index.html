@@ -1038,9 +1038,30 @@
        API LAYER
     ────────────────────────────────────────────── */
     async function apiCall(payload) {
-      const encoded  = encodeURIComponent(JSON.stringify(payload));
-      const url      = `${GAS_URL}?data=${encoded}`;
-      const response = await fetch(url, { method: 'GET', redirect: 'follow', cache: 'no-cache' });
+      const json = JSON.stringify(payload);
+
+      // Untuk payload kecil (mis. login, getMyTodayStatus, dll) tetap pakai GET
+      // agar kompatibel dengan doGet existing. Untuk payload besar (selfie, dll)
+      // pakai POST application/x-www-form-urlencoded supaya tidak melebihi
+      // batas panjang URL (penyebab "Failed to fetch").
+      const useGet = json.length < 1500;
+
+      let response;
+      if (useGet) {
+        const url = `${GAS_URL}?data=${encodeURIComponent(json)}`;
+        response = await fetch(url, { method: 'GET', redirect: 'follow', cache: 'no-cache' });
+      } else {
+        const body = new URLSearchParams({ data: json });
+        response = await fetch(GAS_URL, {
+          method: 'POST',
+          redirect: 'follow',
+          cache: 'no-cache',
+          // Content-Type ini termasuk "simple CORS request" — tidak memicu preflight.
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+          body: body.toString()
+        });
+      }
+
       if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       const text = await response.text();
       try { return JSON.parse(text); }
@@ -1284,8 +1305,11 @@
       const video  = document.getElementById('selfie-video');
       const canvas = document.getElementById('selfie-canvas');
       const ctx    = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, 480, 480);
-      selfieDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+      // Gunakan 360x360 supaya base64 lebih ringan tanpa kehilangan detail wajah.
+      canvas.width  = 360;
+      canvas.height = 360;
+      ctx.drawImage(video, 0, 0, 360, 360);
+      selfieDataUrl = canvas.toDataURL('image/jpeg', 0.6);
 
       // Show preview
       const preview = document.getElementById('selfie-preview');
