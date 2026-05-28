@@ -2597,18 +2597,10 @@
       // Lookup ALL users (termasuk admin) untuk identifikasi record.
       // Trim + lowercase key supaya match defensif terhadap variasi format ID
       // antar sheet (misal: "10155" vs "10155 " vs "P10155").
-      //
-      // Penting: kalau record absensi lama menyimpan PIN (mis. "10155") sebagai
-      // id_karyawan padahal user ber-id "P10155", lookup harus tetap match.
-      // Jadi kita index map dengan DUA key: id_karyawan DAN pin.
       const allUserByID = {};
       allUsers.forEach(u => {
-        const id  = String(u.id_karyawan || '').trim();
-        const pin = String(u.pin || '').trim();
-        if (id) allUserByID[id] = u;
-        // Pin sebagai key cadangan; jangan overwrite kalau ada karyawan lain
-        // yang id-nya kebetulan sama dengan pin orang lain.
-        if (pin && !allUserByID[pin]) allUserByID[pin] = u;
+        const key = String(u.id_karyawan || '').trim();
+        if (key) allUserByID[key] = u;
       });
 
       // Helper: record di-exclude HANYA kalau match dengan user admin/inactive.

@@ -367,7 +367,6 @@ function handleGetUsers(params) {
       no_hp         : ctx.idx.no_hp >= 0 ? str(row[ctx.idx.no_hp]) : '',
       jabatan       : ctx.idx.jabatan >= 0 ? str(row[ctx.idx.jabatan]) : '',
       tanggal_masuk : tglStr,
-      pin           : ctx.idx.pin >= 0 ? str(row[ctx.idx.pin]) : '',  // dipakai frontend sebagai key alternatif untuk lookup leaderboard kalau record absensi lama menyimpan PIN sebagai id_karyawan
       role          : (ctx.idx.role >= 0 ? str(row[ctx.idx.role]) : str(row[3])) || 'Karyawan',
       status        : (ctx.idx.status >= 0 ? str(row[ctx.idx.status]).toLowerCase() : 'active') || 'active',
     });
