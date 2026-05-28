@@ -2589,7 +2589,19 @@
         fetchAbsensiSafe(monthStart, today),
       ]);
 
-      const allUsers = usersRes.users || [];
+      // Pastikan _allUsers (cache yang sudah melewati parser pickField untuk
+      // varian field name nama/Jabatan/dll) terisi. Kalau admin baru buka tab
+      // Overview pertama kali, _allUsers masih kosong → leaderboard akan
+      // tampilkan ID & "—" karena lookup gagal. Trigger loadUsers() dulu.
+      if (!_allUsers || _allUsers.length === 0) {
+        try { await loadUsers(); } catch (_) { /* abaikan */ }
+      }
+
+      // Sumber data user: prioritaskan _allUsers (sudah ter-normalisasi
+      // pickField), fallback ke response mentah getUsers kalau cache kosong.
+      const allUsers = (_allUsers && _allUsers.length > 0)
+        ? _allUsers
+        : (usersRes.users || []);
 
       // Total karyawan = exclude admin & inactive
       const totalKaryawan = allUsers.filter(u => {
@@ -2602,15 +2614,24 @@
       // Trim + lowercase key supaya match defensif terhadap variasi format ID
       // antar sheet (misal: "10155" vs "10155 " vs "P10155").
       const allUserByID = {};
+      const allUserByIDLower = {};
       allUsers.forEach(u => {
         const key = String(u.id_karyawan || '').trim();
-        if (key) allUserByID[key] = u;
+        if (key) {
+          allUserByID[key] = u;
+          allUserByIDLower[key.toLowerCase()] = u;
+        }
       });
+      const findUserByID = (rawId) => {
+        const k = String(rawId || '').trim();
+        if (!k) return null;
+        return allUserByID[k] || allUserByIDLower[k.toLowerCase()] || null;
+      };
 
       // Helper: record di-exclude HANYA kalau match dengan user admin/inactive.
       // Orphan (lookup miss) tetap di-INCLUDE — anggap sebagai karyawan.
       const isExcludedRecord = (r) => {
-        const u = allUserByID[String(r.id_karyawan || '').trim()];
+        const u = findUserByID(r.id_karyawan);
         if (!u) return false;
         const role   = String(u.role   || '').toLowerCase();
         const status = String(u.status || '').toLowerCase();
@@ -2683,8 +2704,8 @@
         });
       const leaderboard = Object.entries(tepatCount)
         .map(([id, count]) => {
-          // Lookup nama+jabatan dari semua user. Kalau orphan, fallback id.
-          const u = allUserByID[id] || {};
+          // Lookup nama+jabatan dari semua user (case-insensitive fallback).
+          const u = findUserByID(id) || {};
           return {
             id_karyawan: id,
             nama: u.nama || id,
