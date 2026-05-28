@@ -1792,12 +1792,22 @@
     /* ──────────────────────────────────────────────
        ADMIN: LOAD TODAY'S ABSENSI
     ────────────────────────────────────────────── */
+    // Helper: hari ini dalam zona WIB (Asia/Jakarta) dengan format YYYY-MM-DD.
+    function todayWIB() {
+      // toLocaleDateString dengan timeZone Asia/Jakarta menghasilkan "DD/MM/YYYY".
+      const parts = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Jakarta' });
+      // 'en-CA' menghasilkan langsung "YYYY-MM-DD".
+      return parts;
+    }
+
     async function loadTodayAbsensi() {
       const tbody = document.getElementById('absensi-tbody');
       showSkeleton(tbody, 6);
 
       try {
-        const res = await apiCall({ action: 'getTodayAbsensi' });
+        // Kirim eksplisit tanggal hari ini (WIB) supaya GAS tidak bergantung
+        // pada timezone server saat menentukan "today".
+        const res = await apiCall({ action: 'getTodayAbsensi', date: todayWIB() });
 
         if (res.today) {
           const d = new Date(res.today + 'T00:00:00+07:00');
