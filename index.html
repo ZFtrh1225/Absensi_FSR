@@ -1172,7 +1172,7 @@
     /* ──────────────────────────────────────────────
        CONFIG
     ────────────────────────────────────────────── */
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwRCBQJO6Y4-h2R6keY4QpQGZ_XdDAgxbfKh1hilmKXvEdqLYS1TUEki4PotH0oW_Yu/exec'; // <-- Paste your deployed GAS URL here
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwN5dxyxjjgYIw0RxoouArolmzP38pRTSq9FLz6i4B90ULSDetuYGTcW8XuGaIarzJa/exec'; // <-- Paste your deployed GAS URL here
 
     // Geofencing config: set your office coordinates & radius (meters)
     const OFFICE_LAT    = -5.395024;  // Latitude kantor
@@ -1685,16 +1685,39 @@
         const isInRadius = distance <= GEOFENCE_RADIUS;
 
         // Step 4: Submit to GAS
-        const res = await apiCall({
-          action      : 'submitAbsensi',
-          id_karyawan : currentUser.id_karyawan,
-          nama        : currentUser.nama,
-          tipe_absen  : tipe,
-          latitude    : coords.lat,
-          longitude   : coords.lon,
-          selfie      : selfie,
-          in_radius   : isInRadius,
-          distance    : Math.round(distance),
+        let alasanInput = '';
+
+        // Cek apakah di luar radius dan merupakan absen masuk (Check-In)
+        if (!isLocationInRadius && currentTipe === 'Check-In') {
+          alasanInput = prompt('Lokasi Anda terdeteksi di luar kantor. Silakan masukkan alasan (Wajib diisi):');
+          
+          // Validasi: Jika karyawan menekan tombol 'Cancel' atau mengosongkan alasan
+          if (alasanInput === null || alasanInput.trim() === '') {
+            alert('Gagal! Alasan wajib diisi untuk absen masuk di luar kantor.');
+            return; // Kode berhenti di sini, absen dibatalkan
+          }
+        }
+        
+        // Mengirim data ke sistem (termasuk alasan)
+        apiCall({
+          action: 'submitAbsensi',
+          id_karyawan: currentUser.id_karyawan,
+          nama: currentUser.nama,
+          tipe_absen: currentTipe,
+          latitude: currentLat,
+          longitude: currentLng,
+          in_radius: isLocationInRadius,
+          distance: distanceToOffice,
+          selfie: selfieBase64,
+          alasan: alasanInput // <-- Ini tambahan parameter baru untuk dikirim ke Code.gs
+        }).then(res => {
+          // Lanjutan logika setelah absen berhasil (biasanya menampilkan pesan sukses atau reload halaman)
+          if (res && res.success) {
+              alert('Absen berhasil!');
+              window.location.reload(); // (atau biarkan kode then(...) lama Anda di sini)
+          } else {
+              alert('Gagal: ' + (res.message || 'Terjadi kesalahan'));
+          }
         });
 
         if (res.success) {
