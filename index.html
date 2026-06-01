@@ -706,6 +706,39 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════
+       ALASAN DILUAR KANTOR MODAL
+  ═══════════════════════════════════════════════ -->
+  <div id="alasan-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width:420px;">
+      <div style="text-align:center;margin-bottom:0.75rem;">
+        <div style="width:56px;height:56px;border-radius:50%;background:rgba(239,68,68,0.12);display:inline-flex;align-items:center;justify-content:center;">
+          <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#ef4444" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
+            <circle cx="12" cy="11" r="3"/>
+          </svg>
+        </div>
+      </div>
+      <h3 style="font-size:1.05rem;font-weight:700;text-align:center;margin:0 0 0.35rem;color:var(--text-primary);">⚠ Lokasi Di Luar Kantor</h3>
+      <p style="font-size:0.82rem;text-align:center;color:var(--text-secondary);margin:0 0 1rem;line-height:1.5;">
+        Anda terdeteksi di luar radius kantor. Wajib mengisi alasan untuk melanjutkan absen masuk.
+      </p>
+      <div style="margin-bottom:1rem;">
+        <label style="display:block;font-size:0.72rem;font-weight:600;color:var(--text-muted);margin-bottom:0.3rem;text-transform:uppercase;letter-spacing:0.04em;">
+          Alasan <span style="color:#ef4444;">*</span>
+        </label>
+        <textarea id="alasan-input" rows="3" class="field field-light"
+          style="padding:0.65rem 1rem;resize:vertical;min-height:80px;"
+          placeholder="Contoh: WFH, perjalanan dinas, kunjungan klien..."></textarea>
+        <p id="alasan-error" style="display:none;color:#ef4444;font-size:0.78rem;margin:0.3rem 0 0;">Alasan tidak boleh kosong.</p>
+      </div>
+      <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
+        <button onclick="cancelAlasan()" class="btn btn-outline">Batalkan Absen</button>
+        <button onclick="confirmAlasan()" class="btn btn-danger" style="padding:0.7rem 1.4rem;">Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST CONTAINER -->
   <div id="toast-container"></div>
 
@@ -825,9 +858,15 @@
         <div class="card anim-slide" style="width:100%;padding:1.25rem 1.5rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;">
             <p style="font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin:0;">Status Hari Ini</p>
-            <span id="attendance-badge" class="badge" style="display:none;"></span>
           </div>
-          <div style="display:flex;gap:1rem;">
+          <!-- Weekend Libur Banner -->
+          <div id="weekend-libur-banner" style="display:none;padding:1rem;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;text-align:center;margin-bottom:0.5rem;">
+            <div style="font-size:1.5rem;margin-bottom:0.25rem;">🏖️</div>
+            <p style="font-size:0.9rem;font-weight:600;color:#6366f1;margin:0;">Hari Libur</p>
+            <p style="font-size:0.75rem;color:var(--text-muted);margin:0.2rem 0 0;">Sabtu & Minggu adalah hari libur kerja</p>
+          </div>
+          <!-- Weekday Time Display -->
+          <div id="weekday-time-display" style="display:flex;gap:1rem;">
             <div style="flex:1;padding:0.75rem;background:#f0fdf4;border-radius:10px;border:1px solid #bbf7d0;">
               <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
                 <span class="status-dot" style="background:#10b981;"></span>
@@ -1172,7 +1211,7 @@
     /* ──────────────────────────────────────────────
        CONFIG
     ────────────────────────────────────────────── */
-    const GAS_URL = 'https://script.google.com/macros/s/AKfycbwN5dxyxjjgYIw0RxoouArolmzP38pRTSq9FLz6i4B90ULSDetuYGTcW8XuGaIarzJa/exec'; // <-- Paste your deployed GAS URL here
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbxbAbDQachLEnw2EQBX2zdYOFuUouF0du1YELCWAcxDV3mPx9L2A38pK6Tu65dRTZLF/exec'; // <-- Paste your deployed GAS URL here
 
     // Geofencing config: set your office coordinates & radius (meters)
     const OFFICE_LAT    = -5.395024;  // Latitude kantor
@@ -1239,6 +1278,50 @@
 
     function closeModal() {
       document.getElementById('custom-modal').classList.remove('active');
+    }
+
+    /* ──────────────────────────────────────────────
+       WEEKEND CHECK HELPER
+    ────────────────────────────────────────────── */
+    function isTodayWeekend() {
+      const wib = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+      return wib.getDay() === 0 || wib.getDay() === 6; // 0 = Minggu, 6 = Sabtu
+    }
+
+    /* ──────────────────────────────────────────────
+       ALASAN DILUAR KANTOR MODAL
+    ────────────────────────────────────────────── */
+    function promptAlasanDiluarKantor() {
+      return new Promise((resolve, reject) => {
+        const modal = document.getElementById('alasan-modal');
+        const input = document.getElementById('alasan-input');
+        const errEl = document.getElementById('alasan-error');
+        input.value = '';
+        errEl.style.display = 'none';
+        modal.classList.add('active');
+        window._alasanResolve = resolve;
+        window._alasanReject  = reject;
+        setTimeout(() => input.focus(), 200);
+      });
+    }
+
+    function confirmAlasan() {
+      const input = document.getElementById('alasan-input');
+      const errEl = document.getElementById('alasan-error');
+      const alasan = input.value.trim();
+      if (!alasan) {
+        errEl.style.display = 'block';
+        input.focus();
+        return;
+      }
+      errEl.style.display = 'none';
+      document.getElementById('alasan-modal').classList.remove('active');
+      if (window._alasanResolve) { window._alasanResolve(alasan); window._alasanResolve = null; }
+    }
+
+    function cancelAlasan() {
+      document.getElementById('alasan-modal').classList.remove('active');
+      if (window._alasanReject) { window._alasanReject(new Error('Absensi dibatalkan oleh pengguna.')); window._alasanReject = null; }
     }
 
     function confirmModal(title, message, onConfirm) {
@@ -1404,7 +1487,20 @@
     function setupKaryawanView() {
       document.getElementById('karyawan-nama').textContent = currentUser.nama;
       document.getElementById('karyawan-id').textContent   = 'ID: ' + currentUser.id_karyawan;
-      loadTodayStatus();
+
+      // Tampilkan banner Libur jika Sabtu/Minggu
+      if (isTodayWeekend()) {
+        const bannerEl  = document.getElementById('weekend-libur-banner');
+        const timeEl    = document.getElementById('weekday-time-display');
+        const btnCheckin  = document.getElementById('btn-checkin');
+        const btnCheckout = document.getElementById('btn-checkout');
+        if (bannerEl)  bannerEl.style.display  = 'block';
+        if (timeEl)    timeEl.style.display     = 'none';
+        if (btnCheckin)  btnCheckin.disabled = true;
+        if (btnCheckout) btnCheckout.disabled = true;
+      } else {
+        loadTodayStatus();
+      }
     }
 
     function switchKaryawanTab(tab) {
@@ -1636,6 +1732,17 @@
        ABSENSI FLOW (Selfie → GPS → Submit)
     ────────────────────────────────────────────── */
     async function startAbsensiFlow(tipe) {
+      // Cek hari libur (Sabtu & Minggu)
+      if (isTodayWeekend()) {
+        showModal({
+          icon: `<div style="width:56px;height:56px;border-radius:50%;background:rgba(99,102,241,0.12);display:inline-flex;align-items:center;justify-content:center;font-size:1.75rem;">🏖️</div>`,
+          title: 'Hari Libur',
+          message: 'Hari ini adalah Sabtu/Minggu (hari libur). Absensi hanya dilakukan pada hari kerja Senin – Jumat.',
+          actions: [{ label: 'Tutup', class: 'btn-outline' }]
+        });
+        return;
+      }
+
       const btnId = tipe === 'Check-In' ? 'btn-checkin' : 'btn-checkout';
       const btn = document.getElementById(btnId);
       const origHtml = btn.innerHTML;
@@ -1684,51 +1791,34 @@
         const distance = calculateDistance(coords.lat, coords.lon, OFFICE_LAT, OFFICE_LON);
         const isInRadius = distance <= GEOFENCE_RADIUS;
 
-        // Step 4: Submit to GAS
-        let alasanInput = '';
-
-        // Cek apakah di luar radius dan merupakan absen masuk (Check-In)
-        if (!isLocationInRadius && currentTipe === 'Check-In') {
-          alasanInput = prompt('Lokasi Anda terdeteksi di luar kantor. Silakan masukkan alasan (Wajib diisi):');
-          
-          // Validasi: Jika karyawan menekan tombol 'Cancel' atau mengosongkan alasan
-          if (alasanInput === null || alasanInput.trim() === '') {
-            alert('Gagal! Alasan wajib diisi untuk absen masuk di luar kantor.');
-            return; // Kode berhenti di sini, absen dibatalkan
+        // Step 3b: Jika Check-In dan di luar kantor, wajib isi alasan
+        let alasanDiluarKantor = '';
+        if (tipe === 'Check-In' && !isInRadius) {
+          try {
+            alasanDiluarKantor = await promptAlasanDiluarKantor();
+          } catch (err) {
+            showToast(err.message || 'Absensi dibatalkan.', 'info'); return;
           }
         }
-        
-        // Mengirim data ke sistem (termasuk alasan)
-        apiCall({
-          action: 'submitAbsensi',
-          id_karyawan: currentUser.id_karyawan,
-          nama: currentUser.nama,
-          tipe_absen: currentTipe,
-          latitude: currentLat,
-          longitude: currentLng,
-          in_radius: isLocationInRadius,
-          distance: distanceToOffice,
-          selfie: selfieBase64,
-          alasan: alasanInput // <-- Ini tambahan parameter baru untuk dikirim ke Code.gs
-        }).then(res => {
-          // Lanjutan logika setelah absen berhasil (biasanya menampilkan pesan sukses atau reload halaman)
-          if (res && res.success) {
-              alert('Absen berhasil!');
-              window.location.reload(); // (atau biarkan kode then(...) lama Anda di sini)
-          } else {
-              alert('Gagal: ' + (res.message || 'Terjadi kesalahan'));
-          }
+
+        // Step 4: Submit to GAS
+        const res = await apiCall({
+          action      : 'submitAbsensi',
+          id_karyawan : currentUser.id_karyawan,
+          nama        : currentUser.nama,
+          tipe_absen  : tipe,
+          latitude    : coords.lat,
+          longitude   : coords.lon,
+          selfie      : selfie,
+          in_radius   : isInRadius,
+          distance    : Math.round(distance),
+          alasan      : alasanDiluarKantor,
         });
 
         if (res.success) {
           const timeStr = res.timestamp ? res.timestamp.substring(11, 19) : '--:--:--';
           showToast(res.message + ' (' + timeStr + ' WIB)' + (!isInRadius ? ' ⚠ Diluar Kantor' : ''), 'success');
           updateStatusDisplay(tipe, timeStr);
-
-          // Update status cerdas
-          const ci = document.getElementById('status-checkin').textContent.replace(' WIB', '');
-          const co = document.getElementById('status-checkout').textContent.replace(' WIB', '');
-          updateAttendanceBadge(ci !== '—' ? ci : null, co !== '—' ? co : null);
         } else {
           showToast(res.message, 'error');
         }
@@ -1757,7 +1847,6 @@
         if (res.success && res.checkin) {
           document.getElementById('status-checkin').textContent = res.checkin + ' WIB';
           if (res.checkout) document.getElementById('status-checkout').textContent = res.checkout + ' WIB';
-          updateAttendanceBadge(res.checkin, res.checkout || null);
         }
       } catch (e) { /* silent */ }
     }
@@ -2516,11 +2605,14 @@
             if (status) keterangan = `<span class="badge ${status.class}">${status.label}</span>`;
           }
 
-          const geoBadge = r.in_radius === true
-            ? '<span class="geofence-badge geofence-in" style="font-size:0.68rem;">Di Kantor</span>'
-            : r.in_radius === false
-            ? '<span class="geofence-badge geofence-out" style="font-size:0.68rem;">Diluar Kantor</span>'
-            : '';
+          // Tampilkan geofence + alasan dalam kolom keterangan
+          let geoPart = '';
+          if (r.in_radius === false) {
+            const alasanTxt = r.alasan ? ` (${escHtml(r.alasan)})` : '';
+            geoPart = `<span class="geofence-badge geofence-out" style="font-size:0.68rem;white-space:normal;max-width:200px;display:inline-block;line-height:1.35;">Diluar Kantor${alasanTxt}</span>`;
+          } else if (r.in_radius === true) {
+            geoPart = `<span class="geofence-badge geofence-in" style="font-size:0.68rem;">Di Kantor</span>`;
+          }
 
           const mapsBtn = r.link_maps
             ? `<a href="${escHtml(r.link_maps)}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:3px;color:#6366f1;font-size:0.75rem;font-weight:500;text-decoration:none;">
@@ -2546,7 +2638,7 @@
               <td><code style="font-size:0.78rem;background:var(--bg-card-hover);padding:0.15rem 0.4rem;border-radius:4px;">${escHtml(r.id_karyawan)}</code></td>
               <td style="font-weight:500;color:var(--text-primary);white-space:nowrap;">${escHtml(r.nama)}</td>
               <td>${badge}</td>
-              <td>${keterangan} ${geoBadge}</td>
+              <td style="min-width:160px;">${keterangan}${keterangan && geoPart ? ' ' : ''}${geoPart}</td>
               <td>${mapsBtn}</td>
               <td style="text-align:center;">${fotoCell}</td>
             </tr>`;
@@ -3083,6 +3175,9 @@
         closeModal();
         closeUserModal();
         closeSelfiePreview();
+        // Alasan modal: Escape = batalkan
+        const alasanModal = document.getElementById('alasan-modal');
+        if (alasanModal && alasanModal.classList.contains('active')) cancelAlasan();
       }
     });
 
