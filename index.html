@@ -3164,7 +3164,12 @@
             <table class="detail-table">
               <thead>
                 <tr>
-                  <th>Tanggal</th><th>Hari</th><th>Masuk</th><th>Pulang</th><th>Status</th><th>Keterangan</th>
+                  <th style="width:58px;">Tanggal</th>
+                  <th style="width:48px;">Hari</th>
+                  <th style="width:52px;">Masuk</th>
+                  <th style="width:52px;">Pulang</th>
+                  <th style="width:72px;">Status</th>
+                  <th>Keterangan</th>
                 </tr>
               </thead>
               <tbody>${rows || '<tr><td colspan="6" class="c muted">Tidak ada data</td></tr>'}</tbody>
@@ -3198,9 +3203,9 @@
 <meta charset="UTF-8" />
 <title>Rekap Absensi FSR — ${escHtml(periodeLabel)}</title>
 <style>
-  @page { size: A4 landscape; margin: 10mm; }
+  @page { size: A4 portrait; margin: 12mm 10mm; }
   * { box-sizing: border-box; }
-  body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; color: #0f172a; font-size: 10px; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; color: #0f172a; font-size: 9px; margin: 0; padding: 0; }
   .header { background: #1e1b4b; color: #fff; padding: 14px 18px; margin-bottom: 12px; border-radius: 0 0 8px 8px; }
   .header h1 { font-size: 16px; margin: 0 0 2px; letter-spacing: 0.02em; }
   .header .sub { color: #c7d2fe; font-size: 10px; }
@@ -3211,11 +3216,11 @@
   .kpi b { display: block; font-size: 14px; color: #1e1b4b; }
   h2 { font-size: 12px; color: #1e1b4b; margin: 16px 0 6px; border-left: 3px solid #6366f1; padding-left: 8px; }
   table { width: 100%; border-collapse: collapse; }
-  th { background: #312e81; color: #fff; padding: 5px 6px; text-align: left; font-size: 9px; }
+  th { background: #312e81; color: #fff; padding: 5px 4px; text-align: left; font-size: 8px; }
   td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-size: 9px; }
   tr:nth-child(even) td { background: #f8fafc; }
   .c { text-align: center; }
-  .ket { max-width: 220px; }
+  .ket { max-width: 140px; word-break: break-word; }
   .muted { color: #94a3b8; }
   .st-ok { color: #166534; font-weight: 600; }
   .st-late { color: #92400e; font-weight: 600; }
@@ -3265,16 +3270,16 @@
   <table>
     <thead>
       <tr>
-        <th style="width:28px;">No</th>
-        <th>ID</th>
+        <th style="width:22px;">No</th>
+        <th style="width:56px;">ID</th>
         <th>Nama</th>
         <th>Jabatan</th>
-        <th class="c">Hadir</th>
-        <th class="c">Tepat</th>
-        <th class="c">Telat</th>
-        <th class="c">Check-Out</th>
-        <th class="c">Alpa</th>
-        <th class="c">Izin/Cuti</th>
+        <th class="c" style="width:36px;">Hadir</th>
+        <th class="c" style="width:36px;">Tepat</th>
+        <th class="c" style="width:36px;">Telat</th>
+        <th class="c" style="width:40px;">C-Out</th>
+        <th class="c" style="width:36px;">Alpa</th>
+        <th class="c" style="width:36px;">Izin</th>
       </tr>
     </thead>
     <tbody>
