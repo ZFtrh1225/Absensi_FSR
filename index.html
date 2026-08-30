@@ -1140,6 +1140,14 @@
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
               Laporan Bulan Ini
             </button>
+            <button onclick="exportRekapBulanan('excel')" class="btn btn-sm btn-success" style="font-size:0.78rem;" title="Unduh rekap absensi (Excel .xls)">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              Rekap Excel
+            </button>
+            <button onclick="exportRekapBulanan('pdf')" class="btn btn-sm btn-outline" style="font-size:0.78rem;" title="Unduh rekap absensi (PDF)">
+              <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+              Rekap PDF
+            </button>
             <button onclick="loadAbsensiRange()" class="btn btn-sm btn-outline" style="font-size:0.78rem;">
               <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
               Refresh
@@ -2660,6 +2668,322 @@
     function changeAbsensiPage(delta) {
       _absensiPage += delta;
       renderAbsensiTable();
+    }
+
+    /* ──────────────────────────────────────────────
+       REKAP BULANAN — Export Excel (.xls) & PDF
+       Menggunakan data rentang tanggal yang sedang
+       ditampilkan (filter from–to + search + tipe).
+    ────────────────────────────────────────────── */
+    async function exportRekapBulanan(format) {
+      if (!_allAbsensi || _allAbsensi.length === 0) {
+        showToast('Belum ada data absensi. Klik "Laporan Bulan Ini" atau atur rentang tanggal dulu.', 'info');
+        return;
+      }
+      if (!_allUsers || _allUsers.length === 0) {
+        try { await loadUsers(); } catch (_) { /* lanjut tanpa jabatan */ }
+      }
+
+      const fromDate = document.getElementById('absensi-from')?.value || '';
+      const toDate   = document.getElementById('absensi-to')?.value || '';
+      const records  = getFilteredAbsensi();
+
+      if (!records.length) {
+        showToast('Tidak ada data yang cocok dengan filter saat ini.', 'error');
+        return;
+      }
+
+      const rekap = buildRekapBulanan(records, fromDate, toDate);
+      const periodeLabel = fromDate === toDate
+        ? formatTanggalIndo(fromDate)
+        : `${formatTanggalIndo(fromDate)} – ${formatTanggalIndo(toDate)}`;
+
+      if (format === 'excel') {
+        downloadRekapExcel(rekap, records, periodeLabel, fromDate, toDate);
+      } else {
+        downloadRekapPdf(rekap, records, periodeLabel, fromDate, toDate);
+      }
+    }
+
+    function buildRekapBulanan(records, fromDate, toDate) {
+      const userMap = {};
+      (_allUsers || []).forEach(u => {
+        const id = String(u.id_karyawan || '').trim();
+        if (id) userMap[id] = u;
+      });
+
+      const byEmp = {};
+      records.forEach(r => {
+        const id = String(r.id_karyawan || '').trim();
+        if (!id) return;
+        const u = userMap[id];
+        if (u && String(u.role || '').toLowerCase() === 'admin') return;
+        if (u && String(u.status || '').toLowerCase() === 'inactive') return;
+
+        if (!byEmp[id]) {
+          byEmp[id] = {
+            id_karyawan: id,
+            nama: r.nama || (u && u.nama) || id,
+            jabatan: (u && u.jabatan) || '',
+            checkins: {},
+            checkouts: {},
+            telat: 0,
+            tepat: 0,
+            totalIn: 0,
+            totalOut: 0,
+          };
+        }
+        const emp = byEmp[id];
+        if (r.nama && (!emp.nama || emp.nama === id)) emp.nama = r.nama;
+
+        const day = (r.timestamp || '').substring(0, 10);
+        const time = (r.timestamp || '').substring(11, 19);
+        if (r.tipe_absen === 'Check-In') {
+          emp.totalIn++;
+          if (!emp.checkins[day]) {
+            emp.checkins[day] = { time, status: r.status || '' };
+            const st = String(r.status || '').toLowerCase();
+            if (st.indexOf('telat') === 0) emp.telat++;
+            else emp.tepat++;
+          }
+        } else if (r.tipe_absen === 'Check-Out') {
+          emp.totalOut++;
+          if (!emp.checkouts[day]) emp.checkouts[day] = time;
+        }
+      });
+
+      let hariKerja = 0;
+      if (fromDate && toDate) {
+        const d1 = new Date(fromDate + 'T00:00:00');
+        const d2 = new Date(toDate + 'T00:00:00');
+        for (let d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
+          const day = d.getDay();
+          if (day !== 0 && day !== 6) hariKerja++;
+        }
+      }
+
+      const list = Object.values(byEmp).map(emp => {
+        const hadirHari = Object.keys(emp.checkins).length;
+        const alpa = Math.max(0, hariKerja - hadirHari);
+        return {
+          id_karyawan: emp.id_karyawan,
+          nama: emp.nama,
+          jabatan: emp.jabatan,
+          hadir: hadirHari,
+          tepat: emp.tepat,
+          telat: emp.telat,
+          checkout: Object.keys(emp.checkouts).length,
+          alpa,
+          totalIn: emp.totalIn,
+          totalOut: emp.totalOut,
+          checkins: emp.checkins,
+          checkouts: emp.checkouts,
+        };
+      }).sort((a, b) => (a.nama || '').localeCompare(b.nama || '', 'id'));
+
+      return { list, hariKerja, totalKaryawan: list.length };
+    }
+
+    function downloadRekapExcel(rekap, records, periodeLabel, fromDate, toDate) {
+      const generatedAt = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
+
+      let summaryRows = `
+        <tr>
+          <th>No</th><th>ID Karyawan</th><th>Nama</th><th>Jabatan</th>
+          <th>Hadir (hari)</th><th>Tepat Waktu</th><th>Telat</th>
+          <th>Check-Out</th><th>Alpa*</th><th>Total Check-In</th><th>Total Check-Out</th>
+        </tr>`;
+      rekap.list.forEach((r, i) => {
+        summaryRows += `<tr>
+          <td>${i + 1}</td>
+          <td>${escHtml(r.id_karyawan)}</td>
+          <td>${escHtml(r.nama)}</td>
+          <td>${escHtml(r.jabatan || '—')}</td>
+          <td style="text-align:center;">${r.hadir}</td>
+          <td style="text-align:center;">${r.tepat}</td>
+          <td style="text-align:center;">${r.telat}</td>
+          <td style="text-align:center;">${r.checkout}</td>
+          <td style="text-align:center;">${r.alpa}</td>
+          <td style="text-align:center;">${r.totalIn}</td>
+          <td style="text-align:center;">${r.totalOut}</td>
+        </tr>`;
+      });
+
+      let detailRows = `
+        <tr>
+          <th>No</th><th>Tanggal</th><th>Waktu</th><th>ID</th><th>Nama</th>
+          <th>Tipe</th><th>Status</th><th>Dalam Radius</th><th>Jarak (m)</th><th>Alasan</th>
+        </tr>`;
+      const sorted = [...records].sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
+      sorted.forEach((r, i) => {
+        const ts = r.timestamp || '';
+        const tgl = ts.substring(0, 10);
+        const wkt = ts.substring(11, 19);
+        const inR = r.in_radius === true ? 'YA' : (r.in_radius === false ? 'TIDAK' : (r.in_radius || ''));
+        detailRows += `<tr>
+          <td>${i + 1}</td>
+          <td>${escHtml(tgl)}</td>
+          <td>${escHtml(wkt)}</td>
+          <td>${escHtml(r.id_karyawan)}</td>
+          <td>${escHtml(r.nama)}</td>
+          <td>${escHtml(r.tipe_absen)}</td>
+          <td>${escHtml(r.status || '')}</td>
+          <td>${escHtml(String(inR))}</td>
+          <td>${escHtml(r.distance != null ? String(r.distance) : '')}</td>
+          <td>${escHtml(r.alasan || '')}</td>
+        </tr>`;
+      });
+
+      const html = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:x="urn:schemas-microsoft-com:office:excel"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta charset="UTF-8" />
+<!--[if gte mso 9]><xml>
+ <x:ExcelWorkbook>
+  <x:ExcelWorksheets>
+   <x:ExcelWorksheet>
+    <x:Name>Ringkasan</x:Name>
+    <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+   </x:ExcelWorksheet>
+  </x:ExcelWorksheets>
+ </x:ExcelWorkbook>
+</xml><![endif]-->
+<style>
+  table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11pt; }
+  th { background: #4338ca; color: #fff; padding: 8px 10px; border: 1px solid #3730a3; text-align: left; }
+  td { padding: 6px 10px; border: 1px solid #cbd5e1; }
+  tr:nth-child(even) td { background: #f1f5f9; }
+  h2 { font-family: Arial, sans-serif; color: #1e1b4b; margin: 0 0 4px; }
+  p  { font-family: Arial, sans-serif; color: #475569; margin: 0 0 12px; font-size: 10pt; }
+  .note { font-size: 9pt; color: #64748b; margin-top: 12px; }
+</style>
+</head>
+<body>
+  <h2>Rekap Absensi Karyawan — FSR</h2>
+  <p><b>Periode:</b> ${escHtml(periodeLabel)}</p>
+  <p><b>Hari kerja (Sen–Jum):</b> ${rekap.hariKerja} hari &nbsp;·&nbsp; <b>Jumlah karyawan:</b> ${rekap.totalKaryawan}</p>
+  <p><b>Dibuat:</b> ${escHtml(generatedAt)} WIB</p>
+
+  <h3 style="font-family:Arial;color:#1e1b4b;">Ringkasan per Karyawan</h3>
+  <table>${summaryRows}</table>
+  <p class="note">* Alpa = hari kerja (Sen–Jum) dalam rentang tanpa Check-In. Weekend tidak dihitung.</p>
+
+  <br/><br/>
+  <h3 style="font-family:Arial;color:#1e1b4b;">Detail Log Absensi</h3>
+  <table>${detailRows}</table>
+</body>
+</html>`;
+
+      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const fname = `Rekap_Absensi_${fromDate || 'all'}_${toDate || 'all'}.xls`;
+      triggerDownload(blob, fname);
+      showToast('Rekap Excel berhasil diunduh.', 'success');
+    }
+
+    function downloadRekapPdf(rekap, records, periodeLabel, fromDate, toDate) {
+      const generatedAt = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
+
+      let rows = '';
+      rekap.list.forEach((r, i) => {
+        rows += `<tr>
+          <td style="text-align:center;">${i + 1}</td>
+          <td>${escHtml(r.id_karyawan)}</td>
+          <td>${escHtml(r.nama)}</td>
+          <td>${escHtml(r.jabatan || '—')}</td>
+          <td style="text-align:center;">${r.hadir}</td>
+          <td style="text-align:center;">${r.tepat}</td>
+          <td style="text-align:center;">${r.telat}</td>
+          <td style="text-align:center;">${r.checkout}</td>
+          <td style="text-align:center;">${r.alpa}</td>
+        </tr>`;
+      });
+
+      const printHtml = `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<title>Rekap Absensi FSR — ${escHtml(periodeLabel)}</title>
+<style>
+  @page { size: A4 landscape; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; font-size: 11px; margin: 0; padding: 0; }
+  h1 { font-size: 16px; margin: 0 0 2px; color: #1e1b4b; }
+  .sub { color: #64748b; font-size: 10px; margin-bottom: 10px; }
+  .meta { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; font-size: 10px; }
+  .meta span { background: #f1f5f9; padding: 3px 8px; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #4338ca; color: #fff; padding: 6px 8px; text-align: left; font-size: 10px; }
+  td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .footer { margin-top: 14px; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+  .note { font-size: 9px; color: #64748b; margin-top: 8px; }
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+  <h1>Rekap Absensi Karyawan — FSR</h1>
+  <div class="sub">Sistem Manajemen Kehadiran</div>
+  <div class="meta">
+    <span><b>Periode:</b> ${escHtml(periodeLabel)}</span>
+    <span><b>Hari kerja:</b> ${rekap.hariKerja} hari</span>
+    <span><b>Karyawan:</b> ${rekap.totalKaryawan}</span>
+    <span><b>Dibuat:</b> ${escHtml(generatedAt)} WIB</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:32px;">No</th>
+        <th>ID</th>
+        <th>Nama</th>
+        <th>Jabatan</th>
+        <th style="text-align:center;">Hadir</th>
+        <th style="text-align:center;">Tepat</th>
+        <th style="text-align:center;">Telat</th>
+        <th style="text-align:center;">Check-Out</th>
+        <th style="text-align:center;">Alpa*</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rows || '<tr><td colspan="9" style="text-align:center;padding:16px;color:#94a3b8;">Tidak ada data</td></tr>'}
+    </tbody>
+  </table>
+  <p class="note">* Alpa = hari kerja (Sen–Jum) dalam rentang tanpa Check-In. Weekend tidak dihitung.</p>
+  <div class="footer">Dokumen digenerate otomatis oleh Absensi FSR.</div>
+  <script>
+    window.onload = function () {
+      setTimeout(function () { window.print(); }, 250);
+    };
+  <\/script>
+</body>
+</html>`;
+
+      const win = window.open('', '_blank');
+      if (!win) {
+        showToast('Pop-up diblokir. Izinkan pop-up untuk mengunduh PDF.', 'error');
+        return;
+      }
+      win.document.open();
+      win.document.write(printHtml);
+      win.document.close();
+      showToast('Jendela cetak PDF dibuka. Pilih "Save as PDF" di dialog print.', 'info', 5000);
+    }
+
+    function triggerDownload(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 1500);
     }
 
 
