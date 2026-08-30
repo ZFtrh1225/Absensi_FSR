@@ -2672,127 +2672,287 @@
 
     /* ──────────────────────────────────────────────
        REKAP BULANAN — Export Excel (.xls) & PDF
-       Menggunakan data rentang tanggal yang sedang
-       ditampilkan (filter from–to + search + tipe).
+       - Semua karyawan aktif (bukan hanya yang hadir)
+       - Jam masuk & pulang per hari + keterangan
+       - Pengajuan izin/cuti dalam periode
+       - Format profesional & informatif
     ────────────────────────────────────────────── */
     async function exportRekapBulanan(format) {
-      if (!_allAbsensi || _allAbsensi.length === 0) {
-        showToast('Belum ada data absensi. Klik "Laporan Bulan Ini" atau atur rentang tanggal dulu.', 'info');
-        return;
-      }
-      if (!_allUsers || _allUsers.length === 0) {
-        try { await loadUsers(); } catch (_) { /* lanjut tanpa jabatan */ }
-      }
-
       const fromDate = document.getElementById('absensi-from')?.value || '';
       const toDate   = document.getElementById('absensi-to')?.value || '';
-      const records  = getFilteredAbsensi();
-
-      if (!records.length) {
-        showToast('Tidak ada data yang cocok dengan filter saat ini.', 'error');
+      if (!fromDate || !toDate) {
+        showToast('Atur rentang tanggal terlebih dahulu, atau klik "Laporan Bulan Ini".', 'info');
         return;
       }
 
-      const rekap = buildRekapBulanan(records, fromDate, toDate);
+      showToast('Menyiapkan rekap…', 'info', 2000);
+
+      // Pastikan data karyawan & absensi tersedia
+      if (!_allUsers || _allUsers.length === 0) {
+        try { await loadUsers(); } catch (_) {}
+      }
+      if (!_allAbsensi || _allAbsensi.length === 0) {
+        try { await loadAbsensiRange(); } catch (_) {}
+      }
+
+      // Ambil pengajuan izin (semua status) untuk periode
+      let izinRecords = [];
+      try {
+        const resIzin = await apiCall({ action: 'getAllIzin' });
+        if (resIzin && resIzin.success && Array.isArray(resIzin.records)) {
+          izinRecords = resIzin.records;
+        }
+      } catch (_) {}
+
+      const records = _allAbsensi || [];
+      const rekap = buildRekapBulananFull(records, izinRecords, fromDate, toDate);
       const periodeLabel = fromDate === toDate
         ? formatTanggalIndo(fromDate)
         : `${formatTanggalIndo(fromDate)} – ${formatTanggalIndo(toDate)}`;
 
       if (format === 'excel') {
-        downloadRekapExcel(rekap, records, periodeLabel, fromDate, toDate);
+        downloadRekapExcel(rekap, periodeLabel, fromDate, toDate);
       } else {
-        downloadRekapPdf(rekap, records, periodeLabel, fromDate, toDate);
+        downloadRekapPdf(rekap, periodeLabel, fromDate, toDate);
       }
     }
 
-    function buildRekapBulanan(records, fromDate, toDate) {
-      const userMap = {};
-      (_allUsers || []).forEach(u => {
-        const id = String(u.id_karyawan || '').trim();
-        if (id) userMap[id] = u;
-      });
+    /** Daftar tanggal YYYY-MM-DD dalam rentang (inklusif) */
+    function enumerateDates(fromDate, toDate) {
+      const out = [];
+      const d1 = new Date(fromDate + 'T00:00:00');
+      const d2 = new Date(toDate + 'T00:00:00');
+      if (isNaN(d1) || isNaN(d2) || d1 > d2) return out;
+      for (let d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        out.push({
+          date: `${y}-${m}-${dd}`,
+          day: d.getDay(), // 0=Min … 6=Sab
+          isWeekend: d.getDay() === 0 || d.getDay() === 6,
+        });
+      }
+      return out;
+    }
 
-      const byEmp = {};
-      records.forEach(r => {
+    const DAY_NAMES_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+    function buildRekapBulananFull(records, izinRecords, fromDate, toDate) {
+      const dates = enumerateDates(fromDate, toDate);
+      const hariKerja = dates.filter(d => !d.isWeekend).length;
+      const hariKalender = dates.length;
+
+      // Map user aktif non-admin
+      const employees = (_allUsers || [])
+        .filter(u => {
+          const role = String(u.role || '').toLowerCase();
+          const status = String(u.status || 'active').toLowerCase();
+          return role !== 'admin' && status !== 'inactive';
+        })
+        .map(u => ({
+          id_karyawan: String(u.id_karyawan || '').trim(),
+          nama: String(u.nama || '').trim(),
+          jabatan: String(u.jabatan || '').trim(),
+        }))
+        .filter(u => u.id_karyawan)
+        .sort((a, b) => (a.nama || '').localeCompare(b.nama || '', 'id'));
+
+      // Index absensi: id → date → { in, out, inStatus, inAlasan, outAlasan }
+      const absByEmp = {};
+      (records || []).forEach(r => {
         const id = String(r.id_karyawan || '').trim();
         if (!id) return;
-        const u = userMap[id];
-        if (u && String(u.role || '').toLowerCase() === 'admin') return;
-        if (u && String(u.status || '').toLowerCase() === 'inactive') return;
-
-        if (!byEmp[id]) {
-          byEmp[id] = {
-            id_karyawan: id,
-            nama: r.nama || (u && u.nama) || id,
-            jabatan: (u && u.jabatan) || '',
-            checkins: {},
-            checkouts: {},
-            telat: 0,
-            tepat: 0,
-            totalIn: 0,
-            totalOut: 0,
-          };
-        }
-        const emp = byEmp[id];
-        if (r.nama && (!emp.nama || emp.nama === id)) emp.nama = r.nama;
-
         const day = (r.timestamp || '').substring(0, 10);
+        if (!day || day < fromDate || day > toDate) return;
         const time = (r.timestamp || '').substring(11, 19);
+        if (!absByEmp[id]) absByEmp[id] = {};
+        if (!absByEmp[id][day]) absByEmp[id][day] = { in: '', out: '', inStatus: '', inAlasan: '', outAlasan: '' };
+        const slot = absByEmp[id][day];
         if (r.tipe_absen === 'Check-In') {
-          emp.totalIn++;
-          if (!emp.checkins[day]) {
-            emp.checkins[day] = { time, status: r.status || '' };
-            const st = String(r.status || '').toLowerCase();
-            if (st.indexOf('telat') === 0) emp.telat++;
-            else emp.tepat++;
+          // Ambil yang paling awal jika ada duplikat
+          if (!slot.in || time < slot.in) {
+            slot.in = time;
+            slot.inStatus = r.status || '';
+            slot.inAlasan = r.alasan || '';
           }
         } else if (r.tipe_absen === 'Check-Out') {
-          emp.totalOut++;
-          if (!emp.checkouts[day]) emp.checkouts[day] = time;
+          if (!slot.out || time > slot.out) {
+            slot.out = time;
+            slot.outAlasan = r.alasan || '';
+          }
         }
       });
 
-      let hariKerja = 0;
-      if (fromDate && toDate) {
-        const d1 = new Date(fromDate + 'T00:00:00');
-        const d2 = new Date(toDate + 'T00:00:00');
-        for (let d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
-          const day = d.getDay();
-          if (day !== 0 && day !== 6) hariKerja++;
-        }
+      // Index izin overlap periode: id → [{dari,sampai,tipe,status,alasan}]
+      const izinByEmp = {};
+      (izinRecords || []).forEach(iz => {
+        const id = String(iz.id_karyawan || '').trim();
+        if (!id) return;
+        const dari = String(iz.dari || '').substring(0, 10);
+        const sampai = String(iz.sampai || '').substring(0, 10);
+        if (!dari || !sampai) return;
+        // overlap dengan [fromDate, toDate]?
+        if (sampai < fromDate || dari > toDate) return;
+        if (!izinByEmp[id]) izinByEmp[id] = [];
+        izinByEmp[id].push({
+          dari, sampai,
+          tipe: iz.tipe || 'Izin',
+          status: iz.status || 'Pending',
+          alasan: iz.alasan || '',
+        });
+      });
+
+      function izinOnDate(id, dateStr) {
+        const list = izinByEmp[id] || [];
+        // prioritaskan Approved
+        const hits = list.filter(iz => iz.dari <= dateStr && dateStr <= iz.sampai);
+        if (!hits.length) return null;
+        hits.sort((a, b) => {
+          const rank = s => (String(s).toLowerCase() === 'approved' ? 0 : String(s).toLowerCase() === 'pending' ? 1 : 2);
+          return rank(a.status) - rank(b.status);
+        });
+        return hits[0];
       }
 
-      const list = Object.values(byEmp).map(emp => {
-        const hadirHari = Object.keys(emp.checkins).length;
-        const alpa = Math.max(0, hariKerja - hadirHari);
-        return {
-          id_karyawan: emp.id_karyawan,
-          nama: emp.nama,
-          jabatan: emp.jabatan,
-          hadir: hadirHari,
-          tepat: emp.tepat,
-          telat: emp.telat,
-          checkout: Object.keys(emp.checkouts).length,
-          alpa,
-          totalIn: emp.totalIn,
-          totalOut: emp.totalOut,
-          checkins: emp.checkins,
-          checkouts: emp.checkouts,
-        };
-      }).sort((a, b) => (a.nama || '').localeCompare(b.nama || '', 'id'));
+      const list = employees.map(emp => {
+        const daily = [];
+        let hadir = 0, tepat = 0, telat = 0, checkoutCount = 0;
+        let alpa = 0, izinApproved = 0, izinPending = 0;
+        let tidakAbsenMasuk = 0, tidakAbsenPulang = 0;
 
-      return { list, hariKerja, totalKaryawan: list.length };
+        dates.forEach(d => {
+          const slot = (absByEmp[emp.id_karyawan] || {})[d.date] || { in: '', out: '', inStatus: '', inAlasan: '', outAlasan: '' };
+          const iz = izinOnDate(emp.id_karyawan, d.date);
+          let statusHari = '';
+          let keterangan = '';
+          let masuk = slot.in || '';
+          let pulang = slot.out || '';
+
+          if (d.isWeekend) {
+            if (masuk || pulang) {
+              statusHari = 'Hadir (Akhir Pekan)';
+              keterangan = [slot.inStatus, slot.inAlasan].filter(Boolean).join(' · ');
+              if (masuk) hadir++; // opsional: hitung weekend hadir
+              if (pulang) checkoutCount++;
+            } else if (iz && String(iz.status).toLowerCase() === 'approved') {
+              statusHari = iz.tipe || 'Izin';
+              keterangan = `Pengajuan ${iz.tipe} disetujui` + (iz.alasan ? ` — ${iz.alasan}` : '');
+              izinApproved++;
+            } else {
+              statusHari = 'Libur';
+              keterangan = 'Akhir pekan';
+            }
+          } else {
+            // Hari kerja
+            if (iz && String(iz.status).toLowerCase() === 'approved') {
+              statusHari = iz.tipe || 'Izin';
+              keterangan = `Pengajuan ${iz.tipe} disetujui` + (iz.alasan ? ` — ${iz.alasan}` : '');
+              izinApproved++;
+              // Jika tetap absen, catat jamnya
+              if (masuk) keterangan += ` · Ada Check-In ${masuk.slice(0, 5)}`;
+              if (pulang) keterangan += ` · Ada Check-Out ${pulang.slice(0, 5)}`;
+            } else if (masuk) {
+              const st = String(slot.inStatus || '').toLowerCase();
+              if (st.indexOf('telat') === 0) {
+                statusHari = 'Telat';
+                telat++;
+              } else {
+                statusHari = 'Tepat Waktu';
+                tepat++;
+              }
+              hadir++;
+              const parts = [];
+              if (slot.inStatus) parts.push(slot.inStatus);
+              if (slot.inAlasan) parts.push(slot.inAlasan);
+              if (!pulang) {
+                parts.push('Tidak absen pulang');
+                tidakAbsenPulang++;
+              }
+              keterangan = parts.join(' · ');
+              if (pulang) checkoutCount++;
+            } else {
+              // Tidak check-in
+              if (iz && String(iz.status).toLowerCase() === 'pending') {
+                statusHari = 'Alpa';
+                keterangan = `Tidak absen masuk · Ada pengajuan ${iz.tipe} (menunggu persetujuan)` + (iz.alasan ? ` — ${iz.alasan}` : '');
+                alpa++;
+                tidakAbsenMasuk++;
+                izinPending++;
+              } else {
+                statusHari = 'Alpa';
+                keterangan = 'Tidak absen masuk';
+                alpa++;
+                tidakAbsenMasuk++;
+              }
+              if (pulang) {
+                keterangan += ` · Ada Check-Out ${pulang.slice(0, 5)} (tanpa Check-In)`;
+              }
+            }
+          }
+
+          daily.push({
+            date: d.date,
+            dayName: DAY_NAMES_ID[d.day],
+            isWeekend: d.isWeekend,
+            masuk: masuk ? masuk.substring(0, 5) : '',
+            pulang: pulang ? pulang.substring(0, 5) : '',
+            status: statusHari,
+            keterangan,
+          });
+        });
+
+        // Izin list for this emp in period
+        const izinList = (izinByEmp[emp.id_karyawan] || []).slice().sort((a, b) => a.dari.localeCompare(b.dari));
+
+        return {
+          ...emp,
+          hadir, tepat, telat, checkoutCount, alpa,
+          izinApproved, izinPending,
+          tidakAbsenMasuk, tidakAbsenPulang,
+          daily, izinList,
+        };
+      });
+
+      // Agregat total
+      const totals = list.reduce((acc, e) => {
+        acc.hadir += e.hadir;
+        acc.tepat += e.tepat;
+        acc.telat += e.telat;
+        acc.alpa += e.alpa;
+        acc.izinApproved += e.izinApproved;
+        return acc;
+      }, { hadir: 0, tepat: 0, telat: 0, alpa: 0, izinApproved: 0 });
+
+      return {
+        list,
+        dates,
+        hariKerja,
+        hariKalender,
+        totalKaryawan: list.length,
+        totals,
+        fromDate,
+        toDate,
+      };
     }
 
-    function downloadRekapExcel(rekap, records, periodeLabel, fromDate, toDate) {
+    function fmtDateShort(yyyymmdd) {
+      if (!yyyymmdd) return '';
+      const p = yyyymmdd.split('-');
+      if (p.length !== 3) return yyyymmdd;
+      return `${p[2]}/${p[1]}/${p[0]}`;
+    }
+
+    function downloadRekapExcel(rekap, periodeLabel, fromDate, toDate) {
       const generatedAt = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
 
-      let summaryRows = `
-        <tr>
-          <th>No</th><th>ID Karyawan</th><th>Nama</th><th>Jabatan</th>
-          <th>Hadir (hari)</th><th>Tepat Waktu</th><th>Telat</th>
-          <th>Check-Out</th><th>Alpa*</th><th>Total Check-In</th><th>Total Check-Out</th>
-        </tr>`;
+      // —— Sheet-like sections in one HTML workbook ——
+      // 1) Ringkasan
+      let summaryRows = `<tr>
+        <th>No</th><th>ID Karyawan</th><th>Nama</th><th>Jabatan</th>
+        <th>Hadir</th><th>Tepat Waktu</th><th>Telat</th><th>Check-Out</th>
+        <th>Alpa</th><th>Izin/Cuti (disetujui)</th><th>Tidak Absen Masuk</th><th>Tidak Absen Pulang</th>
+      </tr>`;
       rekap.list.forEach((r, i) => {
         summaryRows += `<tr>
           <td>${i + 1}</td>
@@ -2802,37 +2962,68 @@
           <td style="text-align:center;">${r.hadir}</td>
           <td style="text-align:center;">${r.tepat}</td>
           <td style="text-align:center;">${r.telat}</td>
-          <td style="text-align:center;">${r.checkout}</td>
+          <td style="text-align:center;">${r.checkoutCount}</td>
           <td style="text-align:center;">${r.alpa}</td>
-          <td style="text-align:center;">${r.totalIn}</td>
-          <td style="text-align:center;">${r.totalOut}</td>
+          <td style="text-align:center;">${r.izinApproved}</td>
+          <td style="text-align:center;">${r.tidakAbsenMasuk}</td>
+          <td style="text-align:center;">${r.tidakAbsenPulang}</td>
         </tr>`;
       });
 
-      let detailRows = `
-        <tr>
-          <th>No</th><th>Tanggal</th><th>Waktu</th><th>ID</th><th>Nama</th>
-          <th>Tipe</th><th>Status</th><th>Dalam Radius</th><th>Jarak (m)</th><th>Alasan</th>
-        </tr>`;
-      const sorted = [...records].sort((a, b) => String(a.timestamp).localeCompare(String(b.timestamp)));
-      sorted.forEach((r, i) => {
-        const ts = r.timestamp || '';
-        const tgl = ts.substring(0, 10);
-        const wkt = ts.substring(11, 19);
-        const inR = r.in_radius === true ? 'YA' : (r.in_radius === false ? 'TIDAK' : (r.in_radius || ''));
-        detailRows += `<tr>
-          <td>${i + 1}</td>
-          <td>${escHtml(tgl)}</td>
-          <td>${escHtml(wkt)}</td>
-          <td>${escHtml(r.id_karyawan)}</td>
-          <td>${escHtml(r.nama)}</td>
-          <td>${escHtml(r.tipe_absen)}</td>
-          <td>${escHtml(r.status || '')}</td>
-          <td>${escHtml(String(inR))}</td>
-          <td>${escHtml(r.distance != null ? String(r.distance) : '')}</td>
-          <td>${escHtml(r.alasan || '')}</td>
-        </tr>`;
+      // 2) Detail harian semua karyawan
+      let detailRows = `<tr>
+        <th>No</th><th>ID</th><th>Nama</th><th>Tanggal</th><th>Hari</th>
+        <th>Jam Masuk</th><th>Jam Pulang</th><th>Status</th><th>Keterangan</th>
+      </tr>`;
+      let n = 0;
+      rekap.list.forEach(emp => {
+        emp.daily.forEach(d => {
+          // Skip weekend kosong agar tidak terlalu panjang? User minta informatif — tampilkan semua hari kerja + hari yang ada aktivitas
+          if (d.isWeekend && !d.masuk && !d.pulang && d.status === 'Libur') return;
+          n++;
+          const masukCell = d.masuk || (d.isWeekend || d.status === 'Libur' || /izin|cuti|sakit|wfh/i.test(d.status)
+            ? '—'
+            : 'Tidak absen masuk');
+          const pulangCell = d.pulang || (d.isWeekend || d.status === 'Libur' || /izin|cuti|sakit|wfh|alpa/i.test(d.status)
+            ? '—'
+            : 'Tidak absen pulang');
+          detailRows += `<tr>
+            <td>${n}</td>
+            <td>${escHtml(emp.id_karyawan)}</td>
+            <td>${escHtml(emp.nama)}</td>
+            <td>${fmtDateShort(d.date)}</td>
+            <td>${escHtml(d.dayName)}</td>
+            <td>${escHtml(masukCell)}</td>
+            <td>${escHtml(pulangCell)}</td>
+            <td>${escHtml(d.status)}</td>
+            <td>${escHtml(d.keterangan || '')}</td>
+          </tr>`;
+        });
       });
+
+      // 3) Pengajuan izin/cuti
+      let izinRows = `<tr>
+        <th>No</th><th>ID</th><th>Nama</th><th>Jenis</th><th>Dari</th><th>Sampai</th><th>Status</th><th>Alasan</th>
+      </tr>`;
+      let izN = 0;
+      rekap.list.forEach(emp => {
+        (emp.izinList || []).forEach(iz => {
+          izN++;
+          izinRows += `<tr>
+            <td>${izN}</td>
+            <td>${escHtml(emp.id_karyawan)}</td>
+            <td>${escHtml(emp.nama)}</td>
+            <td>${escHtml(iz.tipe)}</td>
+            <td>${fmtDateShort(iz.dari)}</td>
+            <td>${fmtDateShort(iz.sampai)}</td>
+            <td>${escHtml(iz.status)}</td>
+            <td>${escHtml(iz.alasan || '')}</td>
+          </tr>`;
+        });
+      });
+      if (izN === 0) {
+        izinRows += `<tr><td colspan="8" style="text-align:center;">Tidak ada pengajuan izin/cuti dalam periode ini.</td></tr>`;
+      }
 
       const html = `<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office"
@@ -2841,63 +3032,164 @@
 <head>
 <meta charset="UTF-8" />
 <!--[if gte mso 9]><xml>
- <x:ExcelWorkbook>
-  <x:ExcelWorksheets>
-   <x:ExcelWorksheet>
-    <x:Name>Ringkasan</x:Name>
-    <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
-   </x:ExcelWorksheet>
-  </x:ExcelWorksheets>
- </x:ExcelWorkbook>
+ <x:ExcelWorkbook><x:ExcelWorksheets>
+  <x:ExcelWorksheet><x:Name>Ringkasan</x:Name>
+   <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+  </x:ExcelWorksheet>
+ </x:ExcelWorksheets></x:ExcelWorkbook>
 </xml><![endif]-->
 <style>
-  table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11pt; }
-  th { background: #4338ca; color: #fff; padding: 8px 10px; border: 1px solid #3730a3; text-align: left; }
-  td { padding: 6px 10px; border: 1px solid #cbd5e1; }
-  tr:nth-child(even) td { background: #f1f5f9; }
-  h2 { font-family: Arial, sans-serif; color: #1e1b4b; margin: 0 0 4px; }
-  p  { font-family: Arial, sans-serif; color: #475569; margin: 0 0 12px; font-size: 10pt; }
-  .note { font-size: 9pt; color: #64748b; margin-top: 12px; }
+  table { border-collapse: collapse; font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+  th { background: #312e81; color: #fff; padding: 8px 10px; border: 1px solid #1e1b4b; text-align: left; font-weight: 600; }
+  td { padding: 6px 10px; border: 1px solid #cbd5e1; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  h1 { font-family: Calibri, Arial, sans-serif; color: #1e1b4b; margin: 0 0 4px; font-size: 18pt; }
+  h2 { font-family: Calibri, Arial, sans-serif; color: #312e81; margin: 22px 0 8px; font-size: 13pt; border-bottom: 2px solid #6366f1; padding-bottom: 4px; }
+  .meta { font-family: Calibri, Arial, sans-serif; color: #334155; font-size: 10pt; margin: 2px 0; }
+  .kpi { display: inline-block; margin: 6px 10px 6px 0; padding: 6px 12px; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px; font-size: 10pt; }
+  .note { font-size: 9pt; color: #64748b; margin-top: 10px; }
+  .header-bar { background: #1e1b4b; color: #fff; padding: 14px 18px; margin: -8px -8px 16px -8px; }
+  .header-bar h1 { color: #fff; margin: 0; }
+  .header-bar .sub { color: #c7d2fe; font-size: 10pt; margin-top: 2px; }
 </style>
 </head>
 <body>
-  <h2>Rekap Absensi Karyawan — FSR</h2>
-  <p><b>Periode:</b> ${escHtml(periodeLabel)}</p>
-  <p><b>Hari kerja (Sen–Jum):</b> ${rekap.hariKerja} hari &nbsp;·&nbsp; <b>Jumlah karyawan:</b> ${rekap.totalKaryawan}</p>
-  <p><b>Dibuat:</b> ${escHtml(generatedAt)} WIB</p>
+  <div class="header-bar">
+    <h1>REKAP ABSENSI KARYAWAN</h1>
+    <div class="sub">Absensi FSR · Sistem Manajemen Kehadiran</div>
+  </div>
 
-  <h3 style="font-family:Arial;color:#1e1b4b;">Ringkasan per Karyawan</h3>
+  <p class="meta"><b>Periode:</b> ${escHtml(periodeLabel)}</p>
+  <p class="meta"><b>Rentang tanggal:</b> ${fmtDateShort(fromDate)} s/d ${fmtDateShort(toDate)} (${rekap.hariKalender} hari kalender)</p>
+  <p class="meta"><b>Hari kerja (Sen–Jum):</b> ${rekap.hariKerja} hari &nbsp;·&nbsp; <b>Jumlah karyawan:</b> ${rekap.totalKaryawan}</p>
+  <p class="meta"><b>Dibuat:</b> ${escHtml(generatedAt)} WIB</p>
+
+  <div style="margin:12px 0;">
+    <span class="kpi"><b>Total Hadir (entry):</b> ${rekap.totals.hadir}</span>
+    <span class="kpi"><b>Tepat Waktu:</b> ${rekap.totals.tepat}</span>
+    <span class="kpi"><b>Telat:</b> ${rekap.totals.telat}</span>
+    <span class="kpi"><b>Alpa:</b> ${rekap.totals.alpa}</span>
+    <span class="kpi"><b>Hari Izin/Cuti disetujui:</b> ${rekap.totals.izinApproved}</span>
+  </div>
+
+  <h2>1. Ringkasan per Karyawan</h2>
   <table>${summaryRows}</table>
-  <p class="note">* Alpa = hari kerja (Sen–Jum) dalam rentang tanpa Check-In. Weekend tidak dihitung.</p>
+  <p class="note">
+    Catatan: Hari kerja = Senin–Jumat dalam rentang (akhir pekan tidak dihitung alpa).
+    Semua karyawan aktif ditampilkan, termasuk yang belum pernah absen pada periode ini.
+  </p>
 
-  <br/><br/>
-  <h3 style="font-family:Arial;color:#1e1b4b;">Detail Log Absensi</h3>
+  <h2>2. Detail Kehadiran Harian</h2>
   <table>${detailRows}</table>
+  <p class="note">
+    Jika tidak ada Check-In pada hari kerja (dan tidak ada izin disetujui) → status Alpa, keterangan "Tidak absen masuk".
+    Jika ada Check-In tanpa Check-Out → keterangan "Tidak absen pulang".
+  </p>
+
+  <h2>3. Pengajuan Izin / Cuti / Sakit / WFH</h2>
+  <table>${izinRows}</table>
 </body>
 </html>`;
 
-      const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
-      const fname = `Rekap_Absensi_${fromDate || 'all'}_${toDate || 'all'}.xls`;
+      const blob = new Blob(['\ufeff' + html], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const fname = `Rekap_Absensi_${fromDate}_${toDate}.xls`;
       triggerDownload(blob, fname);
       showToast('Rekap Excel berhasil diunduh.', 'success');
     }
 
-    function downloadRekapPdf(rekap, records, periodeLabel, fromDate, toDate) {
+    function downloadRekapPdf(rekap, periodeLabel, fromDate, toDate) {
       const generatedAt = new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
 
-      let rows = '';
+      // Ringkasan rows
+      let summaryRows = '';
       rekap.list.forEach((r, i) => {
-        rows += `<tr>
-          <td style="text-align:center;">${i + 1}</td>
+        summaryRows += `<tr>
+          <td class="c">${i + 1}</td>
           <td>${escHtml(r.id_karyawan)}</td>
           <td>${escHtml(r.nama)}</td>
           <td>${escHtml(r.jabatan || '—')}</td>
-          <td style="text-align:center;">${r.hadir}</td>
-          <td style="text-align:center;">${r.tepat}</td>
-          <td style="text-align:center;">${r.telat}</td>
-          <td style="text-align:center;">${r.checkout}</td>
-          <td style="text-align:center;">${r.alpa}</td>
+          <td class="c">${r.hadir}</td>
+          <td class="c">${r.tepat}</td>
+          <td class="c">${r.telat}</td>
+          <td class="c">${r.checkoutCount}</td>
+          <td class="c">${r.alpa}</td>
+          <td class="c">${r.izinApproved}</td>
         </tr>`;
+      });
+
+      // Detail per karyawan (compact)
+      let detailBlocks = '';
+      rekap.list.forEach((emp, idx) => {
+        let rows = '';
+        emp.daily.forEach(d => {
+          if (d.isWeekend && !d.masuk && !d.pulang && d.status === 'Libur') return;
+          const masukCell = d.masuk || (d.isWeekend || d.status === 'Libur' || /izin|cuti|sakit|wfh/i.test(d.status)
+            ? '—'
+            : 'Tidak absen masuk');
+          const pulangCell = d.pulang || (d.isWeekend || d.status === 'Libur' || /izin|cuti|sakit|wfh|alpa/i.test(d.status)
+            ? '—'
+            : 'Tidak absen pulang');
+          const statusClass =
+            d.status === 'Tepat Waktu' ? 'st-ok' :
+            d.status === 'Telat' ? 'st-late' :
+            d.status === 'Alpa' ? 'st-alpa' :
+            /izin|cuti|sakit|wfh/i.test(d.status) ? 'st-izin' : '';
+          rows += `<tr>
+            <td>${fmtDateShort(d.date)}</td>
+            <td>${escHtml(d.dayName)}</td>
+            <td class="c">${escHtml(masukCell)}</td>
+            <td class="c">${escHtml(pulangCell)}</td>
+            <td class="${statusClass}">${escHtml(d.status)}</td>
+            <td class="ket">${escHtml(d.keterangan || '')}</td>
+          </tr>`;
+        });
+
+        let izinNote = '';
+        if (emp.izinList && emp.izinList.length) {
+          izinNote = '<div class="izin-box"><b>Pengajuan dalam periode:</b><ul>' +
+            emp.izinList.map(iz =>
+              `<li>${escHtml(iz.tipe)} ${fmtDateShort(iz.dari)}–${fmtDateShort(iz.sampai)} · <b>${escHtml(iz.status)}</b>${iz.alasan ? ' — ' + escHtml(iz.alasan) : ''}</li>`
+            ).join('') + '</ul></div>';
+        }
+
+        detailBlocks += `
+          <div class="emp-block">
+            <div class="emp-head">
+              <span class="emp-no">${idx + 1}</span>
+              <div>
+                <div class="emp-name">${escHtml(emp.nama)} <span class="emp-id">(${escHtml(emp.id_karyawan)})</span></div>
+                <div class="emp-sub">${escHtml(emp.jabatan || '—')} · Hadir ${emp.hadir} · Telat ${emp.telat} · Alpa ${emp.alpa} · Izin ${emp.izinApproved}</div>
+              </div>
+            </div>
+            <table class="detail-table">
+              <thead>
+                <tr>
+                  <th>Tanggal</th><th>Hari</th><th>Masuk</th><th>Pulang</th><th>Status</th><th>Keterangan</th>
+                </tr>
+              </thead>
+              <tbody>${rows || '<tr><td colspan="6" class="c muted">Tidak ada data</td></tr>'}</tbody>
+            </table>
+            ${izinNote}
+          </div>`;
+      });
+
+      // Global izin table
+      let izinRows = '';
+      let izN = 0;
+      rekap.list.forEach(emp => {
+        (emp.izinList || []).forEach(iz => {
+          izN++;
+          izinRows += `<tr>
+            <td class="c">${izN}</td>
+            <td>${escHtml(emp.id_karyawan)}</td>
+            <td>${escHtml(emp.nama)}</td>
+            <td>${escHtml(iz.tipe)}</td>
+            <td>${fmtDateShort(iz.dari)}</td>
+            <td>${fmtDateShort(iz.sampai)}</td>
+            <td>${escHtml(iz.status)}</td>
+            <td class="ket">${escHtml(iz.alasan || '')}</td>
+          </tr>`;
+        });
       });
 
       const printHtml = `<!DOCTYPE html>
@@ -2906,56 +3198,121 @@
 <meta charset="UTF-8" />
 <title>Rekap Absensi FSR — ${escHtml(periodeLabel)}</title>
 <style>
-  @page { size: A4 landscape; margin: 12mm; }
+  @page { size: A4 landscape; margin: 10mm; }
   * { box-sizing: border-box; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; font-size: 11px; margin: 0; padding: 0; }
-  h1 { font-size: 16px; margin: 0 0 2px; color: #1e1b4b; }
-  .sub { color: #64748b; font-size: 10px; margin-bottom: 10px; }
-  .meta { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 12px; font-size: 10px; }
-  .meta span { background: #f1f5f9; padding: 3px 8px; border-radius: 4px; }
+  body { font-family: 'Segoe UI', Calibri, Arial, sans-serif; color: #0f172a; font-size: 10px; margin: 0; padding: 0; }
+  .header { background: #1e1b4b; color: #fff; padding: 14px 18px; margin-bottom: 12px; border-radius: 0 0 8px 8px; }
+  .header h1 { font-size: 16px; margin: 0 0 2px; letter-spacing: 0.02em; }
+  .header .sub { color: #c7d2fe; font-size: 10px; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .meta-row span { background: #f1f5f9; border: 1px solid #e2e8f0; padding: 4px 9px; border-radius: 5px; font-size: 9.5px; }
+  .kpi-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .kpi { background: #eef2ff; border: 1px solid #c7d2fe; color: #312e81; padding: 6px 12px; border-radius: 6px; font-size: 10px; }
+  .kpi b { display: block; font-size: 14px; color: #1e1b4b; }
+  h2 { font-size: 12px; color: #1e1b4b; margin: 16px 0 6px; border-left: 3px solid #6366f1; padding-left: 8px; }
   table { width: 100%; border-collapse: collapse; }
-  th { background: #4338ca; color: #fff; padding: 6px 8px; text-align: left; font-size: 10px; }
-  td { padding: 5px 8px; border-bottom: 1px solid #e2e8f0; font-size: 10px; }
+  th { background: #312e81; color: #fff; padding: 5px 6px; text-align: left; font-size: 9px; }
+  td { padding: 4px 6px; border-bottom: 1px solid #e2e8f0; font-size: 9px; }
   tr:nth-child(even) td { background: #f8fafc; }
-  .footer { margin-top: 14px; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
-  .note { font-size: 9px; color: #64748b; margin-top: 8px; }
+  .c { text-align: center; }
+  .ket { max-width: 220px; }
+  .muted { color: #94a3b8; }
+  .st-ok { color: #166534; font-weight: 600; }
+  .st-late { color: #92400e; font-weight: 600; }
+  .st-alpa { color: #b91c1c; font-weight: 600; }
+  .st-izin { color: #3730a3; font-weight: 600; }
+  .emp-block { break-inside: avoid; page-break-inside: avoid; margin-bottom: 14px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+  .emp-head { display: flex; align-items: center; gap: 10px; background: #f8fafc; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; }
+  .emp-no { width: 22px; height: 22px; border-radius: 50%; background: #6366f1; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 10px; flex-shrink: 0; }
+  .emp-name { font-weight: 700; font-size: 11px; color: #0f172a; }
+  .emp-id { font-weight: 500; color: #64748b; font-size: 9px; }
+  .emp-sub { color: #64748b; font-size: 9px; margin-top: 1px; }
+  .detail-table th { background: #4338ca; }
+  .izin-box { padding: 6px 10px 8px; background: #eef2ff; font-size: 9px; color: #312e81; }
+  .izin-box ul { margin: 3px 0 0 16px; padding: 0; }
+  .footer { margin-top: 12px; font-size: 8.5px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
+  .note { font-size: 8.5px; color: #64748b; margin-top: 6px; }
   @media print {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .emp-block { break-inside: avoid; }
   }
 </style>
 </head>
 <body>
-  <h1>Rekap Absensi Karyawan — FSR</h1>
-  <div class="sub">Sistem Manajemen Kehadiran</div>
-  <div class="meta">
+  <div class="header">
+    <h1>REKAP ABSENSI KARYAWAN</h1>
+    <div class="sub">Absensi FSR · Sistem Manajemen Kehadiran</div>
+  </div>
+
+  <div class="meta-row">
     <span><b>Periode:</b> ${escHtml(periodeLabel)}</span>
-    <span><b>Hari kerja:</b> ${rekap.hariKerja} hari</span>
+    <span><b>Tanggal:</b> ${fmtDateShort(fromDate)} – ${fmtDateShort(toDate)}</span>
+    <span><b>Hari kalender:</b> ${rekap.hariKalender}</span>
+    <span><b>Hari kerja (Sen–Jum):</b> ${rekap.hariKerja}</span>
     <span><b>Karyawan:</b> ${rekap.totalKaryawan}</span>
     <span><b>Dibuat:</b> ${escHtml(generatedAt)} WIB</span>
   </div>
+
+  <div class="kpi-row">
+    <div class="kpi"><b>${rekap.totals.hadir}</b>Total entry hadir</div>
+    <div class="kpi"><b>${rekap.totals.tepat}</b>Tepat waktu</div>
+    <div class="kpi"><b>${rekap.totals.telat}</b>Telat</div>
+    <div class="kpi"><b>${rekap.totals.alpa}</b>Alpa</div>
+    <div class="kpi"><b>${rekap.totals.izinApproved}</b>Hari izin/cuti disetujui</div>
+  </div>
+
+  <h2>1. Ringkasan per Karyawan</h2>
   <table>
     <thead>
       <tr>
-        <th style="width:32px;">No</th>
+        <th style="width:28px;">No</th>
         <th>ID</th>
         <th>Nama</th>
         <th>Jabatan</th>
-        <th style="text-align:center;">Hadir</th>
-        <th style="text-align:center;">Tepat</th>
-        <th style="text-align:center;">Telat</th>
-        <th style="text-align:center;">Check-Out</th>
-        <th style="text-align:center;">Alpa*</th>
+        <th class="c">Hadir</th>
+        <th class="c">Tepat</th>
+        <th class="c">Telat</th>
+        <th class="c">Check-Out</th>
+        <th class="c">Alpa</th>
+        <th class="c">Izin/Cuti</th>
       </tr>
     </thead>
     <tbody>
-      ${rows || '<tr><td colspan="9" style="text-align:center;padding:16px;color:#94a3b8;">Tidak ada data</td></tr>'}
+      ${summaryRows || '<tr><td colspan="10" class="c muted">Tidak ada karyawan</td></tr>'}
     </tbody>
   </table>
-  <p class="note">* Alpa = hari kerja (Sen–Jum) dalam rentang tanpa Check-In. Weekend tidak dihitung.</p>
-  <div class="footer">Dokumen digenerate otomatis oleh Absensi FSR.</div>
+  <p class="note">Semua karyawan aktif ditampilkan. Hari kerja = Senin–Jumat pada rentang tanggal yang dipilih (akhir pekan tidak dihitung sebagai alpa).</p>
+
+  <h2>2. Detail Kehadiran Harian per Karyawan</h2>
+  ${detailBlocks}
+
+  <h2>3. Rekap Pengajuan Izin / Cuti / Sakit / WFH</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:28px;">No</th>
+        <th>ID</th>
+        <th>Nama</th>
+        <th>Jenis</th>
+        <th>Dari</th>
+        <th>Sampai</th>
+        <th>Status</th>
+        <th>Alasan</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${izinRows || '<tr><td colspan="8" class="c muted">Tidak ada pengajuan dalam periode ini.</td></tr>'}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Dokumen digenerate otomatis oleh Absensi FSR.
+    Keterangan: "Tidak absen masuk" = tidak ada Check-In pada hari kerja tanpa izin disetujui;
+    "Tidak absen pulang" = ada Check-In tetapi tidak ada Check-Out.
+  </div>
   <script>
     window.onload = function () {
-      setTimeout(function () { window.print(); }, 250);
+      setTimeout(function () { window.print(); }, 300);
     };
   <\/script>
 </body>
