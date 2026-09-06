@@ -1,0 +1,128 @@
+<!-- Auto-Update Manager Integration -->
+<script src="./auto-update-manager.js" defer></script>
+
+<style>
+  /* Update Notification Banner */
+  #update-notification {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    color: white;
+    padding: 1rem 1.5rem;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    animation: slideDown 0.3s ease;
+    transition: opacity 0.3s ease;
+  }
+
+  @keyframes slideDown {
+    from {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  #update-notification.hidden {
+    display: none;
+  }
+
+  #update-notification-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+  }
+
+  #update-notification-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  #update-notification-actions button {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  #update-notification-actions .btn-update {
+    background: white;
+    color: #059669;
+  }
+
+  #update-notification-actions .btn-update:hover {
+    opacity: 0.9;
+  }
+
+  #update-notification-actions .btn-close {
+    background: transparent;
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+
+  #update-notification-actions .btn-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  @media (max-width: 640px) {
+    #update-notification {
+      padding: 0.75rem 1rem;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    #update-notification-content {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    #update-notification-actions {
+      width: 100%;
+    }
+
+    #update-notification-actions button {
+      flex: 1;
+    }
+  }
+</style>
+
+<!-- Update Notification Banner -->
+<div id="update-notification">
+  <div id="update-notification-content">
+    <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M16.023 9.348h-3.852v2.568h2.737c-0.435 1.29-1.64 2.202-3.048 2.202-1.797 0-3.261-1.432-3.261-3.202s1.464-3.202 3.261-3.202c0.81 0 1.55 0.312 2.126 0.817l1.857-1.793c-1.355-1.203-3.12-1.936-5.084-1.936-4.386 0-7.952 3.582-7.952 8.002s3.566 8.002 7.952 8.002c3.391 0 6.313-2.165 7.596-5.176l-3.29-2.682z"/>
+    </svg>
+    <div>
+      <strong>✨ Versi Baru Aplikasi Tersedia</strong>
+      <p style="margin: 0.25rem 0 0; font-size: 0.875rem; opacity: 0.9;">Update untuk notifikasi absensi yang lebih baik</p>
+    </div>
+  </div>
+  <div id="update-notification-actions">
+    <button class="btn-update" onclick="autoUpdateManager.reloadApp()">Update Sekarang</button>
+    <button class="btn-close" onclick="autoUpdateManager.closeUpdateNotification()">Nanti</button>
+  </div>
+</div>
+
+<script>
+  // Initialize auto-update detection
+  document.addEventListener('DOMContentLoaded', function() {
+    if (typeof autoUpdateManager !== 'undefined') {
+      console.log('✅ Auto-Update Manager initialized');
+      // Initial check already done in manager init
+    }
+  });
+</script>
