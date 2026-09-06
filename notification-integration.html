@@ -1,0 +1,89 @@
+<!-- Notification Manager Script -->
+<script src="./notification-manager.js" defer></script>
+
+<!-- Integration dengan dashboard karyawan -->
+<script defer>
+  // Wait for DOM to be ready
+  document.addEventListener('DOMContentLoaded', function() {
+    // Initialize notification manager
+    if (typeof notificationManager !== 'undefined') {
+      console.log('Notification Manager initialized');
+      
+      // Update times based on user login (if available)
+      const currentUser = JSON.parse(localStorage.getItem('karyawan_login') || '{}');
+      if (currentUser.id) {
+        // Bisa disesuaikan dengan pengaturan perusahaan dari backend
+        notificationManager.updateSettings('07:00', '16:00', 5);
+      }
+    }
+  });
+
+  /**
+   * Tampilkan UI untuk mengatur notifikasi (di profil/settings)
+   */
+  function showNotificationSettings() {
+    if (typeof notificationManager === 'undefined') return;
+    
+    const settings = notificationManager.getSettings();
+    showModal({
+      title: '⚙ Pengaturan Notifikasi',
+      message: 'Atur waktu pengingat absensi Anda',
+      content: `
+        <div style="text-align: left; gap: 1rem; display: flex; flex-direction: column;">
+          <div>
+            <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.3rem;">
+              Jam Masuk
+            </label>
+            <input type="time" id="settings-checkin-time" value="${settings.checkInTime}" 
+              class="field field-light" style="padding: 0.65rem 1rem; width: 100%;" />
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.3rem;">
+              Jam Pulang
+            </label>
+            <input type="time" id="settings-checkout-time" value="${settings.checkOutTime}" 
+              class="field field-light" style="padding: 0.65rem 1rem; width: 100%;" />
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.3rem;">
+              Pengingat Sebelum (menit)
+            </label>
+            <input type="number" id="settings-reminder-before" value="${settings.reminderBefore}" min="1" max="30"
+              class="field field-light" style="padding: 0.65rem 1rem; width: 100%;" />
+          </div>
+          <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+            <input type="checkbox" id="settings-enabled" ${settings.enabled ? 'checked' : ''} 
+              style="width: 18px; height: 18px; cursor: pointer;" />
+            <span style="font-size: 0.875rem; color: var(--text-secondary);">Aktifkan Notifikasi</span>
+          </label>
+        </div>
+      `,
+      actions: [
+        { label: 'Batal', onclick: 'closeModal()' },
+        { 
+          label: 'Simpan', 
+          onclick: `saveNotificationSettings()`,
+          style: 'background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); color: white; padding: 0.7rem 1.4rem;'
+        }
+      ]
+    });
+  }
+
+  /**
+   * Simpan pengaturan notifikasi
+   */
+  function saveNotificationSettings() {
+    if (typeof notificationManager === 'undefined') return;
+    
+    const checkInTime = document.getElementById('settings-checkin-time')?.value || '07:00';
+    const checkOutTime = document.getElementById('settings-checkout-time')?.value || '16:00';
+    const reminderBefore = parseInt(document.getElementById('settings-reminder-before')?.value || '5');
+    const enabled = document.getElementById('settings-enabled')?.checked || true;
+
+    notificationManager.updateSettings(checkInTime, checkOutTime, reminderBefore);
+    notificationManager.toggleNotifications(enabled);
+
+    showToast('success', '✓ Pengaturan notifikasi berhasil disimpan');
+    closeModal();
+  }
+</script>
