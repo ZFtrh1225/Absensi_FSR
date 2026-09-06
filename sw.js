@@ -74,6 +74,21 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// NOTIFICATION MESSAGE — terima pesan dari client untuk menampilkan notifikasi
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+    const { title, body, tag, icon, badge, actions } = event.data.payload;
+    self.registration.showNotification(title, {
+      body: body,
+      tag: tag,
+      icon: icon,
+      badge: badge,
+      actions: actions,
+      requireInteraction: false
+    });
+  }
+});
+
 // NOTIFICATION CLICK — fokuskan window app saat notif ditap
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
