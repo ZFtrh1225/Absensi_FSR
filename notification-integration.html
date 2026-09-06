@@ -12,8 +12,8 @@
       // Update times based on user login (if available)
       const currentUser = JSON.parse(localStorage.getItem('karyawan_login') || '{}');
       if (currentUser.id) {
-        // Bisa disesuaikan dengan pengaturan perusahaan dari backend
-        notificationManager.updateSettings('07:00', '16:00', 5);
+        // Jam masuk: 07:00, Jam pulang: 17:00, Pengingat: 5 menit sebelumnya
+        notificationManager.updateSettings('07:00', '17:00', 5);
       }
     }
   });
@@ -76,7 +76,7 @@
     if (typeof notificationManager === 'undefined') return;
     
     const checkInTime = document.getElementById('settings-checkin-time')?.value || '07:00';
-    const checkOutTime = document.getElementById('settings-checkout-time')?.value || '16:00';
+    const checkOutTime = document.getElementById('settings-checkout-time')?.value || '17:00';
     const reminderBefore = parseInt(document.getElementById('settings-reminder-before')?.value || '5');
     const enabled = document.getElementById('settings-enabled')?.checked || true;
 
