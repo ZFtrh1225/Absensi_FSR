@@ -1,9 +1,10 @@
 /* Absensi FSR — Service Worker
  * Mendukung "Add to Home Screen" + offline cache shell sederhana
  * + showNotification untuk reminder absen.
+ * + Auto-update detection untuk notifikasi update ke user
  */
 
-const CACHE_NAME = 'absensi-fsr-v1';
+const CACHE_NAME = 'absensi-fsr-v2';
 const APP_SHELL = [
   './',
   './index.html',
@@ -86,6 +87,11 @@ self.addEventListener('message', (event) => {
       actions: actions,
       requireInteraction: false
     });
+  }
+  
+  // Handle skip waiting untuk update
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
 });
 
