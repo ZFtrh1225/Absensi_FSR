@@ -837,6 +837,13 @@
 
     <!-- Karyawan Tab Content -->
     <main id="karyawan-content" style="flex:1;display:flex;flex-direction:column;align-items:center;padding:1.5rem 1.5rem 5rem;gap:1.25rem;max-width:520px;margin:0 auto;width:100%;">
+      <div id="push-reminder-card" class="card" style="width:100%;padding:0.9rem 1rem;display:none;align-items:center;gap:0.75rem;">
+        <div style="flex:1;min-width:0;">
+          <strong style="display:block;font-size:0.82rem;color:var(--text-primary);">Pengingat absensi</strong>
+          <span id="push-reminder-status" style="font-size:0.75rem;color:var(--text-muted);">Aktifkan notifikasi pada HP ini.</span>
+        </div>
+        <button id="push-reminder-btn" type="button" onclick="enablePushReminders()" class="btn btn-primary" style="font-size:0.75rem;padding:0.55rem 0.75rem;">Aktifkan</button>
+      </div>
       <!-- Tab: Absen (default) -->
       <div id="karyawan-tab-absen" style="width:100%;display:flex;flex-direction:column;gap:1.25rem;">
         <!-- Clock card -->
@@ -1215,6 +1222,7 @@
   <!-- ═══════════════════════════════════════════════
        JAVASCRIPT
   ═══════════════════════════════════════════════ -->
+  <script src="./push-config.js"></script>
   <script>
     /* ──────────────────────────────────────────────
        CONFIG
@@ -1444,7 +1452,7 @@
             setupAdminView(); showView('admin'); loadDashboard();
           } else {
             setupKaryawanView(); showView('karyawan');
-            setupReminderNotifications();
+            setupPushReminders();
           }
           startClock();
         } else {
@@ -1480,6 +1488,7 @@
       confirmModal('Keluar dari Akun?', 'Anda akan keluar dari sistem absensi.', () => {
         currentUser = null;
         localStorage.removeItem('absensi_fsr_user');
+        disablePushReminders();
         stopClock();
         document.getElementById('login-id').value = '';
         document.getElementById('login-pin').value = '';
@@ -3679,79 +3688,130 @@
     }
 
     /* ──────────────────────────────────────────────
-       PWA + LOCAL NOTIFICATIONS (Reminder Absen)
+       PWA + WEB PUSH
     ────────────────────────────────────────────── */
+    let pushRegistration;
+    let refreshingAfterUpdate = false;
+    function safeToRefresh() {
+      return !document.querySelector('.modal.active, video, input:focus, textarea:focus');
+    }
+    function refreshForUpdate() {
+      if (refreshingAfterUpdate || !safeToRefresh() || document.visibilityState !== 'visible') return;
+      refreshingAfterUpdate = true;
+      location.reload();
+    }
     function registerServiceWorker() {
       if (!('serviceWorker' in navigator)) return;
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js').catch(err => {
-          console.warn('SW registration failed:', err);
-        });
+      window.addEventListener('load', async () => {
+        try {
+          const registration = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+          pushRegistration = registration;
+          registration.addEventListener('updatefound', () => {
+            const installing = registration.installing;
+            if (installing) installing.addEventListener('statechange', () => {
+              if (installing.state === 'installed' && navigator.serviceWorker.controller) refreshForUpdate();
+            });
+          });
+          navigator.serviceWorker.addEventListener('controllerchange', refreshForUpdate);
+          const update = () => {
+            registration.update().catch(() => {});
+            refreshForUpdate();
+          };
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') update();
+          });
+          window.addEventListener('focus', update);
+          setInterval(() => { if (document.visibilityState === 'visible') update(); }, 30 * 60 * 1000);
+          update();
+          if (currentUser && currentUser.role !== 'Admin') setupPushReminders();
+        } catch (err) { console.warn('Service Worker gagal didaftarkan:', err); }
       });
     }
 
-    async function setupReminderNotifications() {
-      if (!('Notification' in window)) return;
-
-      // Tanyakan izin sekali setelah login (tidak mengganggu)
-      if (Notification.permission === 'default') {
-        try {
-          // Tunda 5 detik agar user sempat melihat dashboard dulu
-          setTimeout(async () => {
-            try { await Notification.requestPermission(); } catch (_) {}
-          }, 5000);
-        } catch (_) {}
-      }
-
-      // Polling tiap 30 detik: kalau jam WIB == 07:55 atau 16:55 → notifikasi
-      if (window._reminderInterval) clearInterval(window._reminderInterval);
-      window._reminderInterval = setInterval(checkReminderTime, 30000);
-      checkReminderTime();
+    const pushApiBase = String(window.ABSENSI_PUSH_API || '').replace(/\/$/, '');
+    function pushUrl(path) { return pushApiBase + '/api/push/' + path; }
+    function pushAvailable() {
+      return Boolean(pushApiBase && /^https:\/\//.test(pushApiBase) &&
+        window.isSecureContext && 'serviceWorker' in navigator &&
+        'PushManager' in window && 'Notification' in window);
     }
-
-    function checkReminderTime() {
-      if (!('Notification' in window) || Notification.permission !== 'granted') return;
-      if (!currentUser || currentUser.role === 'Admin') return;
-
-      const wib = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
-      const h = wib.getHours();
-      const m = wib.getMinutes();
-      const dayKey = `${wib.getFullYear()}-${wib.getMonth()+1}-${wib.getDate()}`;
-
-      // Reminder check-in: 07:55 (sekali per hari)
-      if (h === 7 && m === 55) {
-        const k = 'absensi_reminder_in_' + dayKey;
-        if (!localStorage.getItem(k)) {
-          fireReminder('Jangan lupa absen Masuk!', 'Saatnya melakukan absen Masuk hari ini.');
-          localStorage.setItem(k, '1');
-        }
-      }
-      // Reminder check-out: 16:55 (sekali per hari)
-      if (h === 16 && m === 55) {
-        const k = 'absensi_reminder_out_' + dayKey;
-        if (!localStorage.getItem(k)) {
-          fireReminder('Jangan lupa absen Pulang!', 'Saatnya melakukan absen Pulang hari ini.');
-          localStorage.setItem(k, '1');
-        }
-      }
+    function updatePushUI(message, enabled) {
+      const card = document.getElementById('push-reminder-card');
+      if (!card) return;
+      card.style.display = 'flex';
+      document.getElementById('push-reminder-status').textContent = message;
+      const button = document.getElementById('push-reminder-btn');
+      button.style.display = enabled ? 'none' : '';
     }
-
-    function fireReminder(title, body) {
+    function toApplicationServerKey(base64) {
+      const raw = atob(base64.replace(/-/g, '+').replace(/_/g, '/') +
+        '='.repeat((4 - base64.length % 4) % 4));
+      return Uint8Array.from(raw, c => c.charCodeAt(0));
+    }
+    async function registerPushSubscription(registration) {
+      if (Notification.permission !== 'granted') return;
+      let subscription = await registration.pushManager.getSubscription();
+      if (!subscription) {
+        const response = await fetch(pushUrl('config'), { cache: 'no-store' });
+        if (!response.ok) throw new Error('Server pengingat belum tersedia.');
+        const { publicKey } = await response.json();
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true, applicationServerKey: toApplicationServerKey(publicKey)
+        });
+      }
+      const response = await fetch(pushUrl('subscriptions'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscription })
+      });
+      if (!response.ok) throw new Error('Gagal menyimpan pengingat pada server.');
+      localStorage.setItem('absensi_push_enabled', '1');
+      updatePushUI('Aktif: pengingat 08.00 dan 17.01 WIB.', true);
+    }
+    async function enablePushReminders() {
+      if (!pushAvailable()) {
+        updatePushUI('Pengingat belum tersedia. Hubungi admin aplikasi.', false);
+        return;
+      }
+      const button = document.getElementById('push-reminder-btn');
+      button.disabled = true;
       try {
-        if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-          navigator.serviceWorker.ready.then(reg => {
-            reg.showNotification(title, {
-              body,
-              icon: 'https://api.iconify.design/material-symbols:fingerprint.svg?color=%236366f1',
-              badge: 'https://api.iconify.design/material-symbols:fingerprint.svg?color=%236366f1',
-              tag: 'absensi-reminder',
-              vibrate: [200, 100, 200]
-            });
-          }).catch(() => new Notification(title, { body }));
-        } else {
-          new Notification(title, { body });
-        }
-      } catch (e) { /* silent */ }
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') throw new Error('Izin notifikasi belum diberikan.');
+        const registration = pushRegistration || await navigator.serviceWorker.ready;
+        await registerPushSubscription(registration);
+      } catch (error) {
+        updatePushUI(error.message || 'Gagal mengaktifkan pengingat.', false);
+      } finally { button.disabled = false; }
+    }
+    async function setupPushReminders() {
+      if (!currentUser || currentUser.role === 'Admin') return;
+      if (!pushAvailable()) {
+        updatePushUI('Pengingat belum tersedia. Hubungi admin aplikasi.', false);
+        return;
+      }
+      if (Notification.permission === 'denied') {
+        updatePushUI('Izin notifikasi diblokir. Aktifkan melalui pengaturan HP.', false);
+        return;
+      }
+      updatePushUI('Aktifkan notifikasi pada HP ini.', false);
+      if (Notification.permission !== 'granted' || localStorage.getItem('absensi_push_enabled') !== '1') return;
+      try {
+        const registration = pushRegistration || await navigator.serviceWorker.ready;
+        await registerPushSubscription(registration);
+      } catch (error) { updatePushUI('Koneksi pengingat gagal. Ketuk Aktifkan untuk mencoba lagi.', false); }
+    }
+    async function disablePushReminders() {
+      if (!pushAvailable()) return;
+      try {
+        const registration = pushRegistration || await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (!subscription) return;
+        await fetch(pushUrl('subscriptions'), {
+          method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscription })
+        });
+        await subscription.unsubscribe();
+      } catch (error) { console.warn('Gagal menonaktifkan pengingat:', error); }
     }
 
     /* ──────────────────────────────────────────────
@@ -3894,7 +3954,7 @@
               setupAdminView(); showView('admin'); loadDashboard();
             } else {
               setupKaryawanView(); showView('karyawan');
-              setupReminderNotifications();
+              setupPushReminders();
             }
             startClock();
             return;
