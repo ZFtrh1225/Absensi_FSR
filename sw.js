@@ -1,124 +1,50 @@
-/* Absensi FSR — Service Worker
- * Mendukung "Add to Home Screen" + offline cache shell sederhana
- * + showNotification untuk reminder absen.
- * + Auto-update detection untuk notifikasi update ke user
- */
-
-const CACHE_NAME = 'absensi-fsr-v2';
-const APP_SHELL = [
-  './',
-  './index.html',
-  './manifest.json'
-];
-
-// INSTALL — pre-cache app shell
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL).catch(() => {/* tolerate failures */}))
-      .then(() => self.skipWaiting())
-  );
+/* Absensi FSR — PWA shell and background Web Push */
+const CACHE_NAME = 'absensi-fsr-v3';
+const SHELL = ['./index.html', './manifest.json', './push-config.js'];
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
 });
-
-// ACTIVATE — bersihkan cache lama
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
-  );
+self.addEventListener('activate', event => {
+  event.waitUntil(caches.keys().then(keys =>
+    Promise.all(keys.filter(key => key.startsWith('absensi-fsr-') && key !== CACHE_NAME)
+      .map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
-
-// FETCH — Network first untuk panggilan GAS, Cache first untuk app shell
-self.addEventListener('fetch', (event) => {
-  const req = event.request;
-  if (req.method !== 'GET') return;
-
-  const url = new URL(req.url);
-
-  // Jangan intercept request ke Google Apps Script atau API eksternal
-  if (url.hostname.includes('script.google.com') ||
-      url.hostname.includes('googleusercontent.com')) {
-    return; // biarkan default network behaviour
-  }
-
-  // Untuk asset same-origin: cache-first dengan fallback ke network
-  if (url.origin === location.origin) {
-    event.respondWith(
-      caches.match(req).then((cached) => {
-        if (cached) return cached;
-        return fetch(req).then((res) => {
-          // Cache resource yang berhasil
-          if (res && res.status === 200 && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then((c) => c.put(req, copy));
-          }
-          return res;
-        }).catch(() => caches.match('./index.html'));
-      })
-    );
-    return;
-  }
-
-  // Untuk CDN (tailwind, chartjs, fonts): stale-while-revalidate
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET') return;
+  const url = new URL(request.url);
+  // Never cache Google Apps Script responses or third-party libraries.
+  if (url.origin !== self.location.origin) return;
+  const shell = request.mode === 'navigate' ||
+    ['index.html', 'push-config.js', 'manifest.json'].includes(url.pathname.split('/').pop());
+  if (!shell) return;
   event.respondWith(
-    caches.match(req).then((cached) => {
-      const networked = fetch(req).then((res) => {
-        if (res && res.status === 200) {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((c) => c.put(req, copy));
-        }
-        return res;
-      }).catch(() => cached);
-      return cached || networked;
-    })
-  );
-});
-
-// NOTIFICATION MESSAGE — terima pesan dari client untuk menampilkan notifikasi
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
-    const { title, body, tag, icon, badge, actions } = event.data.payload;
-    self.registration.showNotification(title, {
-      body: body,
-      tag: tag,
-      icon: icon,
-      badge: badge,
-      actions: actions,
-      requireInteraction: false
-    });
-  }
-  
-  // Handle skip waiting untuk update
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-// NOTIFICATION CLICK — fokuskan window app saat notif ditap
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cls) => {
-      for (const c of cls) {
-        if ('focus' in c) return c.focus();
+    fetch(request).then(response => {
+      if (response.ok && response.type === 'basic') {
+        const copy = response.clone();
+        event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.put(request, copy)));
       }
-      if (clients.openWindow) return clients.openWindow('./index.html');
-    })
+      return response;
+    }).catch(async () => (await caches.match(request)) ||
+      (request.mode === 'navigate' ? caches.match('./index.html') : Response.error()))
   );
 });
-
-// Optional: dukungan push event untuk masa depan (membutuhkan VAPID + backend)
-self.addEventListener('push', (event) => {
-  let data = { title: 'Absensi FSR', body: 'Pengingat absen.' };
-  try {
-    if (event.data) data = event.data.json();
-  } catch (_) {}
-  event.waitUntil(
-    self.registration.showNotification(data.title || 'Absensi FSR', {
-      body: data.body || '',
-      icon: 'https://api.iconify.design/material-symbols:fingerprint.svg?color=%236366f1',
-      tag: data.tag || 'absensi-push'
-    })
-  );
+self.addEventListener('push', event => {
+  let payload = {};
+  try { payload = event.data?.json() || {}; } catch { /* empty payload */ }
+  event.waitUntil(self.registration.showNotification(payload.title || 'Absensi FSR', {
+    body: payload.body || 'Jangan lupa melakukan absensi.',
+    tag: payload.tag || 'absensi-reminder',
+    data: { url: './index.html' },
+    vibrate: [200, 100, 200]
+  }));
+});
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windows => {
+    for (const window of windows) {
+      if (window.url.startsWith(self.registration.scope)) return window.focus();
+    }
+    return self.clients.openWindow('./index.html');
+  }));
 });
