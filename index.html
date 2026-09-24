@@ -3693,7 +3693,8 @@
     let pushRegistration;
     let refreshingAfterUpdate = false;
     function safeToRefresh() {
-      return !document.querySelector('.modal.active, video, input:focus, textarea:focus');
+      return !document.querySelector('.modal.active, input:focus, textarea:focus') &&
+        !Array.from(document.querySelectorAll('video')).some(video => video.srcObject && video.srcObject.active);
     }
     function refreshForUpdate() {
       if (refreshingAfterUpdate || !safeToRefresh() || document.visibilityState !== 'visible') return;
